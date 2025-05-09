@@ -30,7 +30,11 @@ namespace TucanScript {
 	#ifndef ExternC
 	#define ExternC extern "C"
 	#endif
-	#define TucanAPI __declspec(dllexport)
+#if defined(_WIN32) || defined(_WIN64)
+    #define TucanAPI __declspec(dllexport)
+#else
+    #define TucanAPI __attribute__((visibility("default")))
+#endif
 #pragma endregion
 
 #pragma region [Math and Shortcuts]
