@@ -463,7 +463,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 					m_Stack.Push (GetMemorySize (src));
 				}
 				else if (src.m_Type Is NATIVEPTR_T) {
-					m_Stack.Push (std::strlen (reinterpret_cast <Sym*>(src.m_Data.m_NativePtr)));
+					m_Stack.Push ((Size) std::strlen (reinterpret_cast <Sym*>(src.m_Data.m_NativePtr)));
 				}
 				else {
 					LogInstErr (nameof (MEMSIZE), InvalidStackPopVal);
@@ -725,6 +725,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 				std::free (buffer);
 				break;
 			}
+#if _WIN32
 			case PTR2DWORD: {
 				auto ptr = PopUnpack ();
 				{
@@ -734,6 +735,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 				m_Stack.Push (ptr);
 				break;
 			}
+#endif
 			case PTR2QWORD: {
 				auto ptr = PopUnpack ();
 				{
@@ -743,6 +745,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 				m_Stack.Push (ptr);
 				break;
 			}
+#if _WIN32
 			case DWORD2PTR: {
 				auto ptr = PopUnpack ();
 				{
@@ -752,6 +755,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 				m_Stack.Push (ptr);
 				break;
 			}
+#endif
 			case QWORD2PTR: {
 				auto ptr = PopUnpack ();
 				{

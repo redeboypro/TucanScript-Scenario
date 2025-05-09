@@ -1,5 +1,5 @@
-#include "..\Compiler.h"
-#include "..\BinaryBuilder.h"
+#include "../Compiler.h"
+#include "../BinaryBuilder.h"
 
 using namespace TucanScript;
 
