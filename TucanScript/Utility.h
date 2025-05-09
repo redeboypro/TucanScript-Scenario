@@ -5,6 +5,7 @@
 	#include <windows.h>
 #else
 	#include <dlfcn.h>
+	#define __stdcall
 #endif
 
 #include <chrono>
@@ -127,7 +128,8 @@ namespace TucanScript {
 	template <typename T>
 	using InitializerList = std::initializer_list<T>;
 
-	using FileStream = std::ifstream;
+	using IFileStream = std::ifstream;
+	using OFileStream = std::ofstream;
 
 	using Mutex = std::mutex;
 
@@ -158,7 +160,7 @@ namespace TucanScript {
 	}
 
 	inline String ReadFileContent (const String& filePath) {
-		FileStream file (filePath);
+		IFileStream file (filePath);
 
 		if (!file.is_open ()) {
 			LogErr ("Error opening file: " << filePath);
@@ -168,6 +170,12 @@ namespace TucanScript {
 		StrStream buffer;
 		buffer << file.rdbuf ();
 		return buffer.str ();
+	}
+
+	inline Sym* GetNewLPCStr (const String& str) {
+		Sym* buffer = new Sym[NextWord (str.size ())];
+		std::strcpy (buffer, str.c_str ());
+		return buffer;
 	}
 #pragma endregion
 
@@ -180,9 +188,17 @@ namespace TucanScript {
 	#endif
 	}
 
+	inline Undef* GetModule (const Sym* libFileName) {
+	#if _WIN64
+		return GetModuleHandleA (libFileName);
+	#else
+		return dlopen (libFileName, RTLD_NOW | RTLD_NOLOAD);
+	#endif
+	}
+
 	inline Undef* ProcAddr (Undef* handle, const Sym* symbolName) {
 	#if _WIN64
-		return (Undef*) (GetProcAddress (static_cast<HMODULE>(handle), symbolName));
+		return (Undef*) (GetProcAddress ((HMODULE) handle, symbolName));
 	#else
 		return dlsym (handle, symbolName);
 	#endif
@@ -190,7 +206,7 @@ namespace TucanScript {
 
 	inline void FreeLib (Undef* handle) {
 	#if _WIN64
-		FreeLibrary (static_cast<HMODULE>(handle));
+		FreeLibrary ((HMODULE) handle);
 	#else
 		dlclose (handle);
 	#endif

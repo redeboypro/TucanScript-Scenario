@@ -126,6 +126,12 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 	auto nextType = TokenType::NONE;
 
 	TokenList rawTokens;
+	auto tryCreateTokenFromWord = [this, &rawTokens](String& tokenStr) {
+		if (!tokenStr.empty ()) {
+			rawTokens.push_back (std::move (CreateToken (tokenStr, TokenType::UNDEFINED)));
+			tokenStr.clear ();
+		}
+	};
 
 	for (UInt64 iChar = Zero; iChar < source.size (); ++iChar) {
 		Sym curChar = source[iChar];
@@ -140,18 +146,12 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 		}
 
 		if (std::isspace (curChar)) {
-			if (!tokenStr.empty ()) {
-				rawTokens.push_back (std::move (CreateToken (tokenStr, TokenType::UNDEFINED)));
-				tokenStr.clear ();
-			}
+			tryCreateTokenFromWord (tokenStr);
 			continue;
 		}
 
 		if (IsTokenReservedSingleChar (curChar, curType)) {
-			if (!tokenStr.empty ()) {
-				rawTokens.push_back (std::move (CreateToken (tokenStr, TokenType::UNDEFINED)));
-				tokenStr.clear ();
-			}
+			tryCreateTokenFromWord (tokenStr);
 
 			if (iChar < source.size () - 1) {
 				auto nextChar = source[NextWord(iChar)];
@@ -229,9 +229,39 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 		}
 	}
 
-	if (!tokenStr.empty ()) {
-		rawTokens.push_back (std::move (CreateToken (tokenStr, TokenType::UNDEFINED)));
+	tryCreateTokenFromWord (tokenStr);
+	return rawTokens;
+}
+
+Lexer::TokenList TucanScript::Lexer::Tokenizer::ProcessIncludeDirectories (const TokenList& tokens, String includeSearchDir) {
+	TokenList processedToken;
+
+	if (!includeSearchDir.empty () && !(includeSearchDir.ends_with (SymbolMap::SlashChar) or includeSearchDir.ends_with ('/'))) {
+		includeSearchDir += SymbolMap::SlashChar;
 	}
 
-	return rawTokens;
+	for (Size iToken = Zero; iToken < tokens.size (); iToken++) {
+		auto& token = tokens[iToken];
+		if (token.m_Type Is TokenType::INCLUDE) {
+			const String* strValuePtr = std::get_if<String> (&tokens[++iToken].m_Val);
+			if (strValuePtr && iToken < PrevWord (tokens.size ())) {
+				TokenList includeTokens = ProcessIncludeDirectories (
+					Tokenize (
+						ReadFileContent (includeSearchDir + *strValuePtr)
+					), 
+					includeSearchDir
+				);
+				processedToken.insert (processedToken.end (), includeTokens.begin (), includeTokens.end ());
+			}
+			else {
+				iToken--;
+				LogErr ("Invalid include format!");
+			}
+		}
+		else {
+			processedToken.push_back (token);
+		}
+	}
+
+	return processedToken;
 }

@@ -9,8 +9,11 @@ namespace TucanScript::VM {
 	union  Word;
 	struct Val;
 	struct Managed;
+	class  VirtualMachine;
 
 	typedef MemoryView<Val> ValMem;
+
+	using ExCall_t = Undef (*)(VirtualMachine*, ValMem* const);
 
 	enum OpCode : UInt8 {
 		HALT,
@@ -72,6 +75,11 @@ namespace TucanScript::VM {
 		CONCAT,
 		STRCAT,
 		STRCPY,
+
+		LOADLIB,
+		LOADSYM,
+		DOEXCALL,
+		GETMOD
 	};
 
 	enum ValType : UInt8 {
@@ -109,31 +117,45 @@ namespace TucanScript::VM {
 	static_assert (SizeEquals<Word, UInt64> (),
 				   "Size of " nameof (TSData) " is not correct!");
 
+#pragma pack(push, 1)
 	struct Val final {
 		mutable ValType m_Type;
 		mutable Word    m_Data;
 	};
+#pragma pack(pop)
 
-	struct ValUtility final {
-		inline static Val GetDWORD (SInt32 value, ValType type = INT32_T) {
+	namespace ValUtility {
+		inline static Val _DWORD (SInt32 value, ValType type = INT32_T) {
 			return Val {
 				.m_Type = type,
-				.m_Data =
-					Word {
-						.m_I32 = value
-					}
+				.m_Data = Word { .m_I32 = value }
 			};
 		}
 
-		inline static Val GetQWORD (UInt64 value, ValType type = UINT64_T) {
+		inline static Val _QWORD (UInt64 value, ValType type = UINT64_T) {
 			return Val {
 				.m_Type = type,
-				.m_Data =
-					Word {
-						.m_U64 = value
-					}
+				.m_Data = Word { .m_U64 = value }
 			};
 		}
+
+		static const Dictionary<ValType, Size> SizeMap =
+		{
+			{CHAR_T,      sizeof (SInt8)},
+			{BYTE_T,      sizeof (UInt8)},
+			{INT16_T,     sizeof (SInt16)},
+			{INT32_T,     sizeof (SInt32)},
+			{INT64_T,     sizeof (SInt64)},
+			{UINT16_T,    sizeof (UInt16)},
+			{UINT32_T,    sizeof (UInt32)},
+			{UINT64_T,    sizeof (UInt64)},
+			{FLOAT32_T,   sizeof (Dec32)},
+			{FLOAT64_T,   sizeof (Dec64)},
+			{MANAGED_T,   sizeof (Managed*)},
+			{NATIVEPTR_T, sizeof (Undef*)},
+			{RADDRESS_T,  sizeof (SInt32)},
+			{LRADDRESS_T, sizeof (SInt32)},
+		};
 	};
 
 	struct Managed final {
@@ -149,7 +171,15 @@ namespace TucanScript::VM {
 		Val    m_Val;
 	};
 
-	using Asm = MemoryView<Instruction>;
+	using ReadOnlyData = MemoryView<Sym*>;
+	using Asm          = MemoryView<Instruction>;
+
+	inline Undef DeleteROData (const ReadOnlyData& roData) {
+		for (Size iLiteral = Zero; iLiteral < roData.m_Size; iLiteral++) {
+			delete[] roData.m_Memory[iLiteral];
+		}
+		delete[] roData.m_Memory;
+	}
 
 	struct Call final {
 		ValMem m_Memory;
@@ -183,6 +213,7 @@ namespace TucanScript::VM {
 		Undef* operator[](UInt64 index);
 
 		Undef PutHandle (const UnsafeMemory& handle);
+		Undef PutReadOnlyData (const ReadOnlyData& roData);
 		Undef Free ();
 	};
 
@@ -414,22 +445,6 @@ namespace TucanScript::VM {
 		Sym* GetCStr (const Managed* managedMemory);
 		Undef AllocStr (Sym* buffer, Size size);
 
-		const Dictionary<ValType, size_t> SizeMap =
-		{
-			{CHAR_T,      sizeof (SInt8)},
-			{BYTE_T,      sizeof (UInt8)},
-			{INT16_T,     sizeof (SInt16)},
-			{INT32_T,     sizeof (SInt32)},
-			{INT64_T,     sizeof (SInt64)},
-			{UINT16_T,    sizeof (UInt16)},
-			{UINT32_T,    sizeof (UInt32)},
-			{UINT64_T,    sizeof (UInt64)},
-			{FLOAT32_T,   sizeof (Dec32)},
-			{FLOAT64_T,   sizeof (Dec64)},
-			{MANAGED_T,   sizeof (Managed*)},
-			{NATIVEPTR_T, sizeof (Undef*)}
-		};
-
 	public:
 		VirtualMachine (
 			UInt64 stackSize,
@@ -442,6 +457,8 @@ namespace TucanScript::VM {
 
 		Undef Run (SInt32 entryPoint = Zero);
 		Undef Free ();
+
+		VMStack* GetStack () { return &m_Stack; };
 	};
 }
 #endif

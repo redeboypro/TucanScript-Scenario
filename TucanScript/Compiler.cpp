@@ -229,7 +229,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 				GenerateInstructionList (innerTokens, varSet, externalContext, stmtData);
 
 				Op (VM::JMP);
-				m_Instructions.back ().m_Val = VM::ValUtility::GetQWORD (statementBeginId);
+				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD (statementBeginId);
 
 				const auto instrEnd = GetInstrEnd ();
 				for (const auto& breakPt : stmtData.m_BreakPoints) {
@@ -246,7 +246,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 			}
 			case Lexer::TokenType::CONTINUE: {
 				Op (VM::JMP);
-				m_Instructions.back ().m_Val = VM::ValUtility::GetQWORD (lastWhileStmt.m_Entry);
+				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD (lastWhileStmt.m_Entry);
 				break;
 			}
 		}
@@ -422,11 +422,12 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 					SInt32 rAddressTest2 = Found (m_DefinedVars, *strValuePtr);
 					if (IsValidID (rAddressTest2)) {
 						SInt32 numArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
+						Push (rAddressTest2, VM::RADDRESS_T);
 						if (numArgs != InvalidSignature) {
-							//Handle external call
-						}
-						else {
-							Push (rAddressTest2, VM::RADDRESS_T);
+							m_Instructions.push_back (VM::Instruction {
+								.m_Op  = VM::DOEXCALL,
+								.m_Val = VM::ValUtility::_DWORD(numArgs)
+							});
 						}
 						continue;
 					}
@@ -506,6 +507,18 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 			}
 		}
 	}
+}
+
+VM::ReadOnlyData TucanScript::Compiler::GetReadOnlyData () {
+	const Size nStrLiterals = m_StringLiterals.size ();
+	VM::ReadOnlyData roData {
+		.m_Memory = new Sym* [nStrLiterals],
+		.m_Size = nStrLiterals
+	};
+	for (Size iLiteral = Zero; iLiteral < nStrLiterals; iLiteral++) {
+		roData.m_Memory[iLiteral] = GetNewLPCStr (m_StringLiterals[iLiteral]);
+	}
+	return roData;
 }
 
 VM::Asm TucanScript::Compiler::GetAssemblyCode () {

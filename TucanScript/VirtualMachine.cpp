@@ -28,6 +28,15 @@ Undef TucanScript::VM::UnsafeDeallocator::PutHandle (const UnsafeMemory& handle)
 	m_Handles[m_NumHandles++] = handle;
 }
 
+Undef TucanScript::VM::UnsafeDeallocator::PutReadOnlyData (const ReadOnlyData& roData) {
+	for (Size iLiteral = Zero; iLiteral < roData.m_Size; iLiteral++) {
+		PutHandle (UnsafeMemory {
+			.m_Type   = STATIC_MEMORY,
+			.m_Handle = roData.m_Memory[iLiteral]
+		});
+	}
+}
+
 Undef TucanScript::VM::UnsafeDeallocator::Free () {
 	if (!m_Handles) {
 		return;
@@ -39,7 +48,7 @@ Undef TucanScript::VM::UnsafeDeallocator::Free () {
 			std::free (handle.m_Handle);
 		}
 		else {
-			FreeLib ((HMODULE) handle.m_Handle);
+			FreeLib (handle.m_Handle);
 		}
 	}
 
@@ -183,7 +192,7 @@ Undef TucanScript::VM::VMAllocator::FreeAll () {
 
 VM::Val TucanScript::VM::VirtualMachine::Unpack (const Val& value) const {
 	auto* memory = GetMemoryAtAddress (value, nullptr);
-	return memory ? *memory:value;
+	return memory ? *memory : value;
 }
 
 VM::Val TucanScript::VM::VirtualMachine::PopUnpack () {
@@ -225,7 +234,7 @@ Undef TucanScript::VM::VirtualMachine::MemCopy (const Val& dest, const Val& src,
 	if (IsRawQWORD (destUnpacked)) {
 		std::memcpy (destUnpacked.m_Data.m_NativePtr,
 					 &srcUnpacked.m_Data, 
-					 SizeMap.at (srcUnpacked.m_Type));
+					 ValUtility::SizeMap.at (srcUnpacked.m_Type));
 		if (pushBack) {
 			m_Stack.Push (destUnpacked);
 		}
@@ -296,13 +305,13 @@ Undef TucanScript::VM::VirtualMachine::AllocStr (Sym* buffer, Size size) {
 		#if CHAR_MIN < Zero
 			.m_Type = CHAR_T,
 			.m_Data = Word {
-				.m_C = buffer[iSym]
-			}
+					.m_C = buffer[iSym]
+				}
 		#else
 			.m_Type = BYTE_T,
 			.m_Data = Word {
-				.m_UC = buffer[iSym]
-			}
+					.m_UC = buffer[iSym]
+				}
 		#endif
 		};
 	}
@@ -418,7 +427,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 					callMemory.m_Size   = callMemorySize;
 				}
 				for (SInt32 iArg = PrevWord (numArgs); iArg >= Zero; iArg--) {
-					MemCopy (ValUtility::GetDWORD (iArg, LRADDRESS_T), m_Stack.Pop (), false);
+					MemCopy (ValUtility::_DWORD (iArg, LRADDRESS_T), m_Stack.Pop (), false);
 				}
 				Jmp (iInst, instruction);
 				break;
@@ -704,9 +713,16 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 				break;
 			}
 			case SCAN: {
-				String inStr;
-				std::getline (std::cin, inStr);
-				AllocStr (inStr.data (), inStr.size ());
+				auto bufferSize = PopUnpack ();
+				if (!TryCast <UInt64> (bufferSize, &Word::m_U64)) {
+					bufferSize.m_Data.m_U64 = 1024ULL; //Default buffer length
+				}
+				Size bufferLength = bufferSize.m_Data.m_U64;
+				Sym* buffer = (Sym*) std::malloc (bufferLength);
+				std::cin.getline (buffer, bufferLength);
+				Size strLength = std::strlen (buffer);
+				AllocStr (buffer, strLength);
+				std::free (buffer);
 				break;
 			}
 			case PTR2DWORD: {
@@ -787,6 +803,75 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 				auto b = PopUnpack ();
 				auto a = PopUnpack ();
 				StrOp (a, b, &std::strcpy);
+				break;
+			}
+			case LOADLIB: {
+				auto* hName = PopUnpack ().m_Data.m_ManagedPtr;
+				auto* cStrName = GetCStr (hName);
+
+				Undef* hLib = GetModule (cStrName);
+				if (!hLib) {
+					hLib = LoadLib (cStrName);
+
+					if (!hLib) {
+						LogInstErr (nameof (LOADLIB), "Failed to load library: " << cStrName);
+						std::free (cStrName);
+						Free ();
+						return;
+					}
+
+					m_GlobalDeallocator->PutHandle (
+						UnsafeMemory {
+							.m_Type = NATIVE_LIBRARY,
+							.m_Handle = hLib,
+						}
+					);
+				}
+				std::free (cStrName);
+				m_Allocator.HandleReferences (hName);
+
+				m_Stack.Push <Undef*, NATIVEPTR_T> (hLib, &Word::m_NativePtr);
+				break;
+			}
+			case LOADSYM: {
+				auto* hName = PopUnpack ().m_Data.m_ManagedPtr;
+				auto* hLib = PopUnpack ().m_Data.m_NativePtr;
+
+				auto* cStrName = GetCStr (hName);
+				auto* hSym = ProcAddr (hLib, cStrName);
+				std::free (cStrName);
+
+				if (!hSym) {
+					LogInstErr (nameof (LOADSYM), "Failed to load symbol: " << cStrName);
+					Free ();
+					return;
+				}
+
+				m_Allocator.HandleReferences (hName);
+
+				m_Stack.Push <Undef*, NATIVEPTR_T> (hSym, &Word::m_NativePtr);
+				break;
+			}
+			case DOEXCALL: {
+				SInt32 nArgs = instruction.m_Val.m_Data.m_I32;
+				ValMem args {
+					.m_Memory = new Val[nArgs],
+					.m_Size   = static_cast<Size> (nArgs)
+				};
+
+				auto hSym = PopUnpack ().m_Data.m_NativePtr;
+				if (!hSym) {
+					LogInstErr (nameof (DOEXCALL), "Null function pointer!");
+					Free ();
+					return;
+				}
+
+				for (SInt32 iArg = PrevWord (nArgs); iArg >= Zero; iArg--) {
+					args.m_Memory[iArg] = PopUnpack ();
+				}
+
+				((ExCall_t) hSym) (this, &args);
+				delete[] args.m_Memory;
 				break;
 			}
 		}

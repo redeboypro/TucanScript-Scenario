@@ -141,7 +141,6 @@ namespace TucanScript {
 		}
 
 		inline VM::Instruction& Op (Lexer::TokenType type) {
-			Log ((SInt32)type);
 			return m_Instructions.emplace_back (VM::Instruction {
 				.m_Op = OpMap.at (type)
 			});
@@ -187,12 +186,12 @@ namespace TucanScript {
 			funInfo.m_Calls.push_back (m_Instructions.size ());
 			m_Instructions.push_back (VM::Instruction {
 				.m_Op  = VM::JMPR,
-				.m_Val = VM::ValUtility::GetQWORD (Zero)
+				.m_Val = VM::ValUtility::_QWORD (Zero)
 			});
 		}
 
 		inline VM::Val GetInstrEnd (QWORD offset = Zero) {
-			return VM::ValUtility::GetQWORD (m_Instructions.size () + offset);
+			return VM::ValUtility::_QWORD (m_Instructions.size () + offset);
 		}
 
 		inline Boolean IsLeftBracket (const Lexer::Token& token) {
@@ -290,6 +289,10 @@ namespace TucanScript {
 			{ "malloc",          VM::CMEMALLOC },
 			{ "strcat",          VM::STRCAT },
 			{ "strcpy",          VM::STRCPY },
+
+			//Native wrapping
+			{ "LoadLibrary",     VM::LOADLIB },
+			{ "GetProcAddr",     VM::LOADSYM },
 		};
 
 		const Dictionary<VM::OpCode, String> OpDebugMap {
@@ -343,6 +346,9 @@ namespace TucanScript {
 			{VM::STRCAT,        "NativeConcat"},
 			{VM::STRCPY,        "NativeStringCopy"},
 			{VM::HALT,          "Halt"},
+			{VM::LOADLIB,       "LoadLibrary"},
+			{VM::LOADSYM,       "LoadSym"},
+			{VM::DOEXCALL,      "ExternalCall"},
 		};
 
 	public:
@@ -356,6 +362,7 @@ namespace TucanScript {
 			}
 		}
 
+		VM::ReadOnlyData GetReadOnlyData ();
 		VM::Asm GetAssemblyCode ();
 		Undef LogInstr ();
 	};

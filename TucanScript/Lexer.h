@@ -86,11 +86,13 @@ namespace TucanScript::Lexer {
 		//Statement goto
 		BREAK,
 		CONTINUE,
+
+		INCLUDE
 	};
 
 	struct Token final {
 		TokenVal  m_Val;
-		TokenType m_Type;
+		TokenType m_Type { TokenType::NONE };
 	};
 
 	static const Dictionary<Sym, TokenType> ReservedSingleCharMap {
@@ -122,7 +124,8 @@ namespace TucanScript::Lexer {
 		{ "def",      TokenType::DEF },
 		{ "imp",      TokenType::IMP },
 		{ "break",    TokenType::BREAK },
-		{ "continue", TokenType::CONTINUE }
+		{ "continue", TokenType::CONTINUE },
+		{ "include",  TokenType::INCLUDE }
 	};
 
 	class Tokenizer final {
@@ -155,6 +158,7 @@ namespace TucanScript::Lexer {
 		Boolean IsTokenReservedWord (const String& source, TokenType& type);
 
 		TokenList Tokenize (const String& source);
+		TokenList ProcessIncludeDirectories (const TokenList& tokens, String includeSearchDir);
 	};
 }
 
