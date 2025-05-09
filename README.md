@@ -1,5 +1,5 @@
 # TucanScript
-![img](./NestedResources/Logo.png)
+<img src="./NestedResources/Logo.png" width="128" height="128">
 Simple scripting engine with binary tools
 
 ## About
