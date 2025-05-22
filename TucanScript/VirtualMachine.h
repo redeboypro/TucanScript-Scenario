@@ -278,6 +278,17 @@ namespace TucanScript::VM {
 		Undef FreeAll ();
 	};
 
+	struct Task final {
+		QWORD     m_qInstr;
+		Boolean   m_Running;
+		VMStack   m_Stack;
+		JmpMemory m_Frame;
+	};
+
+	struct TaskPool final {
+
+	};
+
 	class VirtualMachine final {
 		VMStack            m_Stack;
 		VMAllocator        m_Allocator;
@@ -287,15 +298,15 @@ namespace TucanScript::VM {
 		JmpMemory          m_JmpMemory;
 		Boolean            m_Free {};
 
-		Val Unpack (const Val& value) const;
-		Val PopUnpack ();
+		VM::Val Unpack(JmpMemory& frame, const Val& value) const;
+		VM::Val PopUnpack(VMStack& stack, JmpMemory& frame);
 		Undef Jmp (Size& iInst, Instruction& instruction);
 
-		inline Call& GetLastCall () const {
-			return m_JmpMemory.m_Sequence[m_JmpMemory.m_Depth];
+		inline Call& GetLastCall (JmpMemory& jmpMemory) const {
+			return jmpMemory.m_Sequence[jmpMemory.m_Depth];
 		}
 
-		Val* GetMemoryAtAddress (const Val& src, Val* defaultValue) const;
+		VM::Val * GetMemoryAtAddress(JmpMemory& frame, const Val& src, Val* defaultValue) const;
 
 		inline UInt64 GetMemorySize (const Val& value) const {
 			return value.m_Data.m_ManagedPtr->m_Size;
@@ -305,8 +316,8 @@ namespace TucanScript::VM {
 			return &m_FixedMemory.m_Memory[address];
 		}
 
-		Val* GetMemoryAtLRAddress (SInt32 address) const {
-			return &GetLastCall ().m_Memory.m_Memory[address];
+		Val * GetMemoryAtLRAddress (JmpMemory& frame, SInt32 address) const {
+			return &GetLastCall (frame).m_Memory.m_Memory[address];
 		}
 
 		Undef FreeManagedMemory (Val* memory);
@@ -374,7 +385,7 @@ namespace TucanScript::VM {
 				Cast<TYPE> (*GetMemoryAtRAddress (poppedValue.m_Data.m_I32), type, sourceField);
 			}
 			else if (poppedValue.m_Type Is LRADDRESS_T) {
-				Cast<TYPE> (*GetMemoryAtLRAddress (poppedValue.m_Data.m_I32), type, sourceField);
+				Cast<TYPE> (*GetMemoryAtLRAddress(_placeholder_, poppedValue.m_Data.m_I32), type, sourceField);
 			}
 			else {
 				Cast<TYPE> (poppedValue, type, sourceField);
@@ -433,7 +444,7 @@ namespace TucanScript::VM {
 			}
 		}
 
-		Undef MemCopy (const Val& dest, const Val& src, Boolean pushBack = true);
+		Undef MemCopy(VMStack& stack, JmpMemory& frame, const Val& dest, const Val& src, Boolean pushBack = true);
 
 		inline Boolean IsTrue (const Val& value) const {
 			return (value.m_Type Is BYTE_T  && value.m_Data.m_UC) ||
@@ -441,9 +452,11 @@ namespace TucanScript::VM {
 				   (value.m_Type Is INT32_T && value.m_Data.m_I32);
 		}
 
-		Undef StrOp (const Val& a, const Val& b, Sym* (*op)(Sym*, const Sym*));
+		Undef StrOp(VMStack& stack, const Val& a, const Val& b, Sym* (*op)(Sym*, const Sym*));
 		Sym* GetCStr (const Managed* managedMemory);
-		Undef AllocStr (Sym* buffer, Size size);
+		Undef AllocStr(VMStack& stack, Sym* buffer, Size size);
+
+		Undef HandleInstr(QWORD& qInstr, VMStack& stack, JmpMemory& frame);
 
 	public:
 		VirtualMachine (
