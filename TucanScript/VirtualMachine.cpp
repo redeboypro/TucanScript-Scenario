@@ -224,14 +224,13 @@ Undef TucanScript::VM::VirtualMachine::FreeManagedMemory (Val* memory) {
 	}
 }
 
-#define IsRawQWORD(VAL) (VAL).m_Type == UINT64_T || (VAL).m_Type == NATIVEPTR_T
 Undef TucanScript::VM::VirtualMachine::MemCopy (const Val& dest, const Val& src, Boolean pushBack) {
 	auto srcUnpacked = Unpack (src);
 
 	auto* destUnpackTry = GetMemoryAtAddress (dest, nullptr);
 	auto& destUnpacked = destUnpackTry ? *destUnpackTry : dest;
 
-	if (IsRawQWORD (destUnpacked)) {
+	if (destUnpacked.m_Type Is NATIVEPTR_T) {
 		std::memcpy (destUnpacked.m_Data.m_NativePtr,
 					 &srcUnpacked.m_Data, 
 					 ValUtility::SizeMap.at (srcUnpacked.m_Type));
@@ -241,14 +240,14 @@ Undef TucanScript::VM::VirtualMachine::MemCopy (const Val& dest, const Val& src,
 		return;
 	}
 
-	if (destUnpacked.m_Type == MANAGED_T) {
+	if (destUnpacked.m_Type Is MANAGED_T) {
 		m_Allocator.RemoveRef (destUnpacked.m_Data.m_ManagedPtr);
 	}
 
 	destUnpacked.m_Type = srcUnpacked.m_Type;
 	destUnpacked.m_Data = srcUnpacked.m_Data;
 
-	if (destUnpacked.m_Type == MANAGED_T) {
+	if (destUnpacked.m_Type Is MANAGED_T) {
 		destUnpacked.m_Data.m_ManagedPtr->m_RefCount++;
 	}
 
@@ -478,7 +477,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 
 				if (src.m_Type Is MANAGED_T) {
 					auto* managedMemory = src.m_Data.m_ManagedPtr;
-					m_Stack.Push (managedMemory->m_Memory[id.m_Data.m_I32]);
+					m_Stack.Push (managedMemory->m_Memory[id.m_Data.m_U64]);
 					m_Allocator.HandleReferences (managedMemory);
 				}
 				else {
@@ -495,7 +494,7 @@ Undef TucanScript::VM::VirtualMachine::Run (SInt32 entryPoint) {
 
 				if (auto* memory = GetMemoryAtAddress (dest, nullptr)) {
 					if (memory->m_Type Is MANAGED_T) {
-						MemCopy (memory->m_Data.m_ManagedPtr->m_Memory[id.m_Data.m_I32], src);
+						MemCopy (memory->m_Data.m_ManagedPtr->m_Memory[id.m_Data.m_U64], src);
 					}
 				}
 				else {
