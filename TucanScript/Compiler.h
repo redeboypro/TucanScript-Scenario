@@ -28,7 +28,7 @@ namespace TucanScript {
 	struct FuncInfo final {
 		VarSet         m_DefinedVars;
 		SInt32         m_NumArgs {};
-		QWORD          m_Address {};
+		SInt64         m_Address {};
 		Vector<QWORD>  m_Calls {};
 	};
 
@@ -182,16 +182,17 @@ namespace TucanScript {
 			});
 		}
 
-		inline Undef Call (FuncInfo& funInfo) {
+		inline Undef Call (FuncInfo& funInfo, Boolean async = false) {
 			funInfo.m_Calls.push_back (m_Instructions.size ());
 			m_Instructions.push_back (VM::Instruction {
-				.m_Op  = VM::JMPR,
-				.m_Val = VM::ValUtility::_QWORD (Zero)
+				.m_Op  = async ? VM::CALLASYNC : VM::JMPR,
+				.m_Val = VM::Val { .m_Type = VM::ValType::INT64_T }
 			});
 		}
 
 		inline VM::Val GetInstrEnd (QWORD offset = Zero) {
-			return VM::ValUtility::_QWORD (m_Instructions.size () + offset);
+			QWORD instrWord = m_Instructions.size () + offset;
+			return VM::ValUtility::_QWORD_signed_raw (&instrWord, true);
 		}
 
 		inline Boolean IsLeftBracket (const Lexer::Token& token) {
@@ -276,6 +277,7 @@ namespace TucanScript {
 			{ "Log",             VM::PRINT },
 			{ "Scan",            VM::SCAN },
 			{ "PopStack",        VM::POP },
+			{ "SetTaskProps",    VM::SETTASKPROPS },
 			{ "Alloc",           VM::MEMALLOC },
 			{ "Append",          VM::MEMAPPEND },
 			{ "Free",            VM::MEMDEALLOC },
@@ -302,6 +304,7 @@ namespace TucanScript {
 			{VM::JMP,           "Jmp"},
 			{VM::JMPC,          "Jmp (Conditional)"},
 			{VM::JMPR,          "Jmp (Call recording)"},
+			{VM::CALLASYNC,     "CallAsync"},
 			{VM::RETURN,        "Return"},
 			{VM::MEMSIZE,       "MemorySize"},
 			{VM::MEMLOAD,       "MemoryLoad"},
@@ -349,6 +352,7 @@ namespace TucanScript {
 			{VM::LOADLIB,       "LoadLibrary"},
 			{VM::LOADSYM,       "LoadSym"},
 			{VM::DOEXCALL,      "ExternalCall"},
+			{VM::SETTASKPROPS,  "SetTaskAllocProps"},
 		};
 
 	public:
@@ -357,7 +361,7 @@ namespace TucanScript {
 			for (auto& funPair : m_DefinedFuncs) {
 				auto& funInfo = funPair.second;
 				for (auto inst : funInfo.m_Calls) {
-					m_Instructions[inst].m_Val.m_Data.m_I32 = funInfo.m_Address;
+					m_Instructions[inst].m_Val.m_Data.m_I64 = funInfo.m_Address;
 				}
 			}
 		}

@@ -87,6 +87,8 @@ namespace TucanScript::Lexer {
 		BREAK,
 		CONTINUE,
 
+		//Additional
+		ASYNC,
 		INCLUDE
 	};
 
@@ -125,7 +127,8 @@ namespace TucanScript::Lexer {
 		{ "imp",      TokenType::IMP },
 		{ "break",    TokenType::BREAK },
 		{ "continue", TokenType::CONTINUE },
-		{ "include",  TokenType::INCLUDE }
+		{ "include",  TokenType::INCLUDE },
+		{ "async",    TokenType::ASYNC }
 	};
 
 	class Tokenizer final {

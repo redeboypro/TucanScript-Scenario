@@ -8,22 +8,22 @@ using namespace TucanScript;
 
 #define StackSize       512ULL
 #define FixedMemorySize 512ULL
-#define MaxCallDepth    1024
+#define MaxCallDepth    1024ULL
 
 #define nArg_StackSize       2
 #define nArg_FixedMemorySize 3
 #define nArg_MaxCallDepth    4
 
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
-	if (nArgs <= 1) {
-		LogErr ("Invalid binary file path argument!");
-		return InvalidSignature;
-	}
+	//if (nArgs <= 1) {
+	//	LogErr ("Invalid binary file path argument!");
+	//	return InvalidSignature;
+	//}
 
 	TucanScript::VM::ReadOnlyData roData {};
 	TucanScript::VM::Asm asm_ {};
 
-	TucanScript::Binary::BinaryBuilder::Decompose (args[1], asm_, roData);
+	TucanScript::Binary::BinaryBuilder::Decompose ("C:\\TS\\AsyncTest.tbin", asm_, roData);
 
 	auto staticDealloc = new TucanScript::VM::UnsafeDeallocator ();
 	staticDealloc->PutReadOnlyData (roData);
@@ -38,7 +38,7 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 		LogErr ("Invalid fixed memory size format");
 	}
 
-	SInt32 callDepthLimit = MaxCallDepth;
+	Size callDepthLimit = MaxCallDepth;
 	if (nArgs > nArg_MaxCallDepth && !TryParse (args[nArg_MaxCallDepth], callDepthLimit)) {
 		LogErr ("Invalid call depth limit format");
 	}
@@ -50,7 +50,7 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 		std::move (asm_),
 		staticDealloc);
 
-	vm->Run ();
+	vm->Run (Zero);
 
 	delete vm;
 	return Zero;

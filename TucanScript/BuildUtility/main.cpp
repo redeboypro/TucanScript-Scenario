@@ -32,7 +32,6 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 			includeDir
 		)
 	);
-
 	compiler->LogInstr ();
 	VM::Asm assembly = compiler->GetAssemblyCode ();
 	VM::ReadOnlyData roData = compiler->GetReadOnlyData ();

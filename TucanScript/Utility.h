@@ -39,7 +39,19 @@ namespace TucanScript {
 
 #pragma region [Math and Shortcuts]
 	#define Zero 0
+
+#ifndef Max
+	#define Max(A, B) (((A) > (B)) ? (A) : (B))
+#endif
+
+#ifndef Min
+	#define Min(A, B) (((A) < (B)) ? (A) : (B))
+#endif
+
+#ifndef Clamp
 	#define Clamp(ANGLE, MIN, MAX) ANGLE < MIN ? MIN : ANGLE > MAX ? MAX : ANGLE
+#endif
+
 	#define NextWord(WORD) (WORD + 1)
 	#define PrevWord(WORD) (WORD - 1)
 	#define Is ==

@@ -155,7 +155,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 						ProcStatement (rawTokens, ++iToken, argTokens);
 						QWORD jmpOpId = m_Instructions.size ();
 						Op (VM::JMP);
-						funInfo.m_Address = NextWord (jmpOpId);
+						funInfo.m_Address = static_cast<SInt64> (NextWord (jmpOpId));
 						GenerateInstructionList (argTokens, funInfo.m_DefinedVars, false, lastWhileStmt);
 						if (m_Instructions.back ().m_Op != VM::RETURN) {
 							Push (Zero);
@@ -229,7 +229,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 				GenerateInstructionList (innerTokens, varSet, externalContext, stmtData);
 
 				Op (VM::JMP);
-				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD (statementBeginId);
+				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD_signed_raw (&statementBeginId, true);
 
 				const auto instrEnd = GetInstrEnd ();
 				for (const auto& breakPt : stmtData.m_BreakPoints) {
@@ -246,7 +246,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 			}
 			case Lexer::TokenType::CONTINUE: {
 				Op (VM::JMP);
-				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD (lastWhileStmt.m_Entry);
+				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD_signed_raw (&lastWhileStmt.m_Entry, true);
 				break;
 			}
 		}
@@ -405,10 +405,22 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 					auto funIt = m_DefinedFuncs.find (*strValuePtr);
 					if (funIt != m_DefinedFuncs.end ()) {
 						auto& funInfo = funIt->second;
-						ProcArgs (expressionTokens, iToken, varSet, externalContext);
-						Push (funInfo.m_NumArgs);
-						Push (static_cast<SInt32>(funInfo.m_DefinedVars.size ()));
-						Call (funInfo);
+
+						Boolean async = iToken < PrevWord (numTokens) && expressionTokens[NextWord (iToken)].m_Type Is Lexer::TokenType::ASYNC;
+						if (async) {
+							iToken++;
+						}
+
+						SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
+						Log (nArgs);
+						if (IsValidID (nArgs)) {
+							Push (funInfo.m_NumArgs);
+							Push (static_cast<SInt32>(funInfo.m_DefinedVars.size ()));
+							Call (funInfo, async);
+						}
+						else {
+							LogErr ("Invalid call signature for " << *strValuePtr);
+						}
 						continue;
 					}
 
@@ -426,7 +438,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						if (numArgs != InvalidSignature) {
 							m_Instructions.push_back (VM::Instruction {
 								.m_Op  = VM::DOEXCALL,
-								.m_Val = VM::ValUtility::_DWORD(numArgs)
+								.m_Val = VM::ValUtility::_DWORD_signed_raw(&numArgs, false)
 							});
 						}
 						continue;

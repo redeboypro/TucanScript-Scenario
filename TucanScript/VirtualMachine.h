@@ -23,6 +23,7 @@ namespace TucanScript::VM {
 		JMP,
 		JMPC,		//Jump if false (Conditional jump)
 		JMPR,       //Jump with recording
+		CALLASYNC,  //Start coroutine
 		RETURN,
 
 		MEMSIZE,
@@ -79,7 +80,9 @@ namespace TucanScript::VM {
 		LOADLIB,
 		LOADSYM,
 		DOEXCALL,
-		GETMOD
+		GETMOD,
+
+		SETTASKPROPS
 	};
 
 	enum ValType : UInt8 {
@@ -125,17 +128,31 @@ namespace TucanScript::VM {
 #pragma pack(pop)
 
 	namespace ValUtility {
-		inline static Val _DWORD (SInt32 value, ValType type = INT32_T) {
+		inline static Val _DWORD_signed_raw (Undef* value, Boolean fromUnsigned) {
+			UInt32 raw;
+			std::memcpy (&raw, value, sizeof (raw));
+			SInt32 signedWord = fromUnsigned ? static_cast<SInt32>(raw) : std::bit_cast<SInt32>(raw);
+
+			Word wordDef {};
+			std::memcpy (&wordDef, &signedWord, sizeof (signedWord));
+
 			return Val {
-				.m_Type = type,
-				.m_Data = Word { .m_I32 = value }
+				.m_Type = INT32_T,
+				.m_Data = wordDef
 			};
 		}
 
-		inline static Val _QWORD (UInt64 value, ValType type = UINT64_T) {
+		inline static Val _QWORD_signed_raw (Undef* value, Boolean fromUnsigned) {
+			UInt64 raw;
+			std::memcpy (&raw, value, sizeof (raw));
+			SInt64 signedWord = fromUnsigned ? static_cast<SInt64>(raw) : std::bit_cast<SInt64>(raw);
+
+			Word wordDef {};
+			std::memcpy (&wordDef, &signedWord, sizeof (signedWord));
+
 			return Val {
-				.m_Type = type,
-				.m_Data = Word { .m_U64 = value }
+				.m_Type = INT64_T,
+				.m_Data = wordDef
 			};
 		}
 
@@ -183,12 +200,37 @@ namespace TucanScript::VM {
 
 	struct Call final {
 		ValMem m_Memory;
-		QWORD  m_Address;
+		SInt64 m_Address;
 	};
 
 	struct JmpMemory final {
 		Call* m_Sequence;
+		Size  m_Capacity;
 		Size  m_Depth;
+
+		inline Undef ZeroOutMemory () {
+			if (!m_Sequence)
+				return;
+
+			for (QWORD qCall = Zero; qCall < m_Capacity; qCall++) {
+				m_Sequence[qCall].m_Memory.m_Memory = nullptr;
+			}
+		}
+		
+		inline Undef Free () {
+			if (!m_Sequence)
+				return;
+
+			for (QWORD qCall = Zero; qCall < m_Capacity; qCall++) {
+				Call& call = m_Sequence[qCall];
+				delete[] call.m_Memory.m_Memory;
+				call.m_Memory.m_Memory = nullptr;
+			}
+
+			delete[] m_Sequence;
+			m_Sequence = nullptr;
+			m_Capacity = Zero;
+		}
 	};
 
 	enum UnsafeMemoryType : UInt8 {
@@ -279,14 +321,53 @@ namespace TucanScript::VM {
 	};
 
 	struct Task final {
-		QWORD     m_qInstr;
+		SInt64    m_qInstr;
 		Boolean   m_Running;
-		VMStack   m_Stack;
+		VMStack*  m_Stack;
 		JmpMemory m_Frame;
 	};
 
-	struct TaskPool final {
+	using lpTask = Task*;
 
+	class TaskPool final {
+		lpTask* m_Tasks { nullptr };
+		Size    m_Capacity { Zero };
+
+		typedef struct {
+			Size m_StackSize;
+			Size m_CallDepth;
+		} TaskMemoryProps;
+
+		Undef Resize (Size newCapacity);
+
+	public:
+		TaskPool () = default;
+
+		~TaskPool () {
+			Free ();
+		}
+
+		lpTask Run (QWORD qInstr);
+
+		constexpr Size GetCapacity () const {
+			return m_Capacity;
+		}
+
+		lpTask GetTask (QWORD qTask) const {
+			return m_Tasks[qTask];
+		}
+
+		Undef Free ();
+
+		TaskMemoryProps m_TaskMemoryProps { 128ULL, 100ULL };
+	};
+
+	struct MemCpyFrameArgs final {
+		JmpMemory* m_SrcFrame { nullptr };
+		JmpMemory* m_DestFrame { nullptr };
+
+		MemCpyFrameArgs () = default;
+		MemCpyFrameArgs (JmpMemory* ptr) : m_SrcFrame (ptr), m_DestFrame (ptr) {}
 	};
 
 	class VirtualMachine final {
@@ -296,17 +377,18 @@ namespace TucanScript::VM {
 		UnsafeDeallocator* m_GlobalDeallocator;
 		ValMem             m_FixedMemory;
 		JmpMemory          m_JmpMemory;
+		TaskPool           m_TaskPool;
 		Boolean            m_Free {};
 
-		VM::Val Unpack(JmpMemory& frame, const Val& value) const;
-		VM::Val PopUnpack(VMStack& stack, JmpMemory& frame);
-		Undef Jmp (Size& iInst, Instruction& instruction);
+		VM::Val Unpack (JmpMemory& frame, const Val& value) const;
+		VM::Val PopUnpack (VMStack& stack, JmpMemory& frame);
+		Undef Jmp (SInt64 & iInst, Instruction& instruction);
 
 		inline Call& GetLastCall (JmpMemory& jmpMemory) const {
 			return jmpMemory.m_Sequence[jmpMemory.m_Depth];
 		}
 
-		VM::Val * GetMemoryAtAddress(JmpMemory& frame, const Val& src, Val* defaultValue) const;
+		VM::Val * GetMemoryAtAddress (JmpMemory& frame, const Val& src, Val* defaultValue) const;
 
 		inline UInt64 GetMemorySize (const Val& value) const {
 			return value.m_Data.m_ManagedPtr->m_Size;
@@ -316,7 +398,7 @@ namespace TucanScript::VM {
 			return &m_FixedMemory.m_Memory[address];
 		}
 
-		Val * GetMemoryAtLRAddress (JmpMemory& frame, SInt32 address) const {
+		Val* GetMemoryAtLRAddress (JmpMemory& frame, SInt32 address) const {
 			return &GetLastCall (frame).m_Memory.m_Memory[address];
 		}
 
@@ -379,13 +461,13 @@ namespace TucanScript::VM {
 		}
 
 		template<typename TYPE>
-		Undef Cast (ValType type, TYPE Word::* sourceField) {
+		Undef Cast (JmpMemory& frame, ValType type, TYPE Word::* sourceField) {
 			auto poppedValue = m_Stack.Pop ();
 			if (poppedValue.m_Type Is RADDRESS_T) {
 				Cast<TYPE> (*GetMemoryAtRAddress (poppedValue.m_Data.m_I32), type, sourceField);
 			}
 			else if (poppedValue.m_Type Is LRADDRESS_T) {
-				Cast<TYPE> (*GetMemoryAtLRAddress(_placeholder_, poppedValue.m_Data.m_I32), type, sourceField);
+				Cast<TYPE> (*GetMemoryAtLRAddress(frame, poppedValue.m_Data.m_I32), type, sourceField);
 			}
 			else {
 				Cast<TYPE> (poppedValue, type, sourceField);
@@ -444,7 +526,7 @@ namespace TucanScript::VM {
 			}
 		}
 
-		Undef MemCopy(VMStack& stack, JmpMemory& frame, const Val& dest, const Val& src, Boolean pushBack = true);
+		Undef MemCopy(VMStack& stack, MemCpyFrameArgs frameArgs, const Val& dest, const Val& src, Boolean pushBack = true);
 
 		inline Boolean IsTrue (const Val& value) const {
 			return (value.m_Type Is BYTE_T  && value.m_Data.m_UC) ||
@@ -452,23 +534,25 @@ namespace TucanScript::VM {
 				   (value.m_Type Is INT32_T && value.m_Data.m_I32);
 		}
 
-		Undef StrOp(VMStack& stack, const Val& a, const Val& b, Sym* (*op)(Sym*, const Sym*));
+		Undef StrOp (VMStack& stack, const Val& a, const Val& b, Sym* (*op)(Sym*, const Sym*));
 		Sym* GetCStr (const Managed* managedMemory);
 		Undef AllocStr(VMStack& stack, Sym* buffer, Size size);
 
-		Undef HandleInstr(QWORD& qInstr, VMStack& stack, JmpMemory& frame);
+		Undef DoRecordJump(SInt64& qContextInstr, SInt64& qTargetInstr, VMStack& stack, const MemCpyFrameArgs & frameArgs);
+
+		TucanScript::SInt32 HandleInstr (SInt64& qInstr, VMStack& stack, JmpMemory& frame);
 
 	public:
 		VirtualMachine (
 			UInt64 stackSize,
 			UInt64 fixedMemSize,
-			SInt32 callDepth,
+			UInt64 callDepth,
 			Asm&& asm_,
 			UnsafeDeallocator* staticDeallocator);
 
 		~VirtualMachine ();
 
-		Undef Run (SInt32 entryPoint = Zero);
+		Undef Run (SInt64 entryPoint = Zero);
 		Undef Free ();
 
 		VMStack* GetStack () { return &m_Stack; };
