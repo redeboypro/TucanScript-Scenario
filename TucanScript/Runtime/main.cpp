@@ -15,15 +15,15 @@ using namespace TucanScript;
 #define nArg_MaxCallDepth    4
 
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
-	//if (nArgs <= 1) {
-	//	LogErr ("Invalid binary file path argument!");
-	//	return InvalidSignature;
-	//}
+	if (nArgs <= 1) {
+		LogErr ("Invalid binary file path argument!");
+		return InvalidSignature;
+	}
 
 	TucanScript::VM::ReadOnlyData roData {};
 	TucanScript::VM::Asm asm_ {};
 
-	TucanScript::Binary::BinaryBuilder::Decompose ("C:\\TS\\AsyncTest.tbin", asm_, roData);
+	TucanScript::Binary::BinaryBuilder::Decompose (args[1], asm_, roData);
 
 	auto staticDealloc = new TucanScript::VM::UnsafeDeallocator ();
 	staticDealloc->PutReadOnlyData (roData);
