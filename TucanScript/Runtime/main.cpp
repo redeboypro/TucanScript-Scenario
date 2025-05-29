@@ -14,6 +14,10 @@ using namespace TucanScript;
 #define nArg_FixedMemorySize 3
 #define nArg_MaxCallDepth    4
 
+VM::VirtualMachine* vm { nullptr };
+
+static Undef FreeVM () { vm->Free (); }
+
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 	if (nArgs <= 1) {
 		LogErr ("Invalid binary file path argument!");
@@ -43,12 +47,14 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 		LogErr ("Invalid call depth limit format");
 	}
 
-	auto vm = new TucanScript::VM::VirtualMachine (
+	vm = new TucanScript::VM::VirtualMachine (
 		stackSize,
 		fixedMemorySize,
 		callDepthLimit,
 		std::move (asm_),
 		staticDealloc);
+
+	atexit (FreeVM);
 
 	vm->Run (Zero);
 

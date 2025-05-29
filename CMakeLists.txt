@@ -9,6 +9,11 @@ add_library (Math SHARED
 			TucanScript/Utility.h
 			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
 
+add_library (Time SHARED
+			TucanScript/SystemModules/Time/Time.h TucanScript/SystemModules/Time/Time.cpp
+			TucanScript/Utility.h
+			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+
 add_executable (tbinc
 			 TucanScript/BuildUtility/main.cpp
 			 TucanScript/Utility.h
