@@ -71,7 +71,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 			case Lexer::TokenType::DEF: {
 				argTokens.clear ();
 				ReadTo (Lexer::TokenType::SEMICOLON, rawTokens, iToken, argTokens);
-				QWORD iSubToken = OpenCounter;
+				QWord iSubToken = OpenCounter;
 				if (IsUndefined (argTokens[iSubToken].m_Type)) {
 					curToken = argTokens[iSubToken];
 					String funName = std::move (std::get<String> (curToken.m_Val));
@@ -153,7 +153,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 					if (IsLBrace (rawTokens[NextWord (iToken)].m_Type)) {
 						auto& funInfo = funIt->second;
 						ProcStatement (rawTokens, ++iToken, argTokens);
-						QWORD jmpOpId = m_Instructions.size ();
+						QWord jmpOpId = m_Instructions.size ();
 						Op (VM::JMP);
 						funInfo.m_Address = static_cast<SInt64> (NextWord (jmpOpId));
 						GenerateInstructionList (argTokens, funInfo.m_DefinedVars, false, lastWhileStmt);
@@ -177,14 +177,14 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 				Lexer::TokenList conditionExpr;
 				ReadTo (Lexer::TokenType::LBRACE, rawTokens, iToken, conditionExpr);
 				ProcExpression (conditionExpr, varSet, externalContext);
-				QWORD condJmpOpId = m_Instructions.size ();
+				QWord condJmpOpId = m_Instructions.size ();
 				Op (VM::JMPC);
 
 				Lexer::TokenList ifTokens;
 				ProcStatement (rawTokens, iToken, ifTokens);
 				GenerateInstructionList (ifTokens, varSet, externalContext, lastWhileStmt);
 
-				QWORD nextTokenId = NextWord (iToken);
+				QWord nextTokenId = NextWord (iToken);
 				auto isNextElse = nextTokenId < rawTokens.size () && 
 					rawTokens[NextWord (iToken)].m_Type Is Lexer::TokenType::ELSE;
 				if (isNextElse) {
@@ -195,7 +195,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 				m_Instructions[condJmpOpId].m_Val = GetInstrEnd ();
 
 				if (isNextElse) {
-					QWORD endStatementJmpOpId = PrevWord (m_Instructions.size ());
+					QWord endStatementJmpOpId = PrevWord (m_Instructions.size ());
 					Lexer::TokenList elseTokens;
 					if (IsLBrace (rawTokens[NextWord (iToken)].m_Type)) {
 						ProcStatement (rawTokens, ++iToken, elseTokens);
@@ -212,11 +212,11 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 			case Lexer::TokenType::WHILE: {
 				Lexer::TokenList conditionExpr;
 
-				QWORD statementBeginId = m_Instructions.size ();
+				QWord statementBeginId = m_Instructions.size ();
 				ReadTo (Lexer::TokenType::LBRACE, rawTokens, iToken, conditionExpr);
 				ProcExpression (conditionExpr, varSet, externalContext);
 
-				QWORD condJmpOpId = m_Instructions.size ();
+				QWord condJmpOpId = m_Instructions.size ();
 				Op (VM::JMPC);
 
 				Lexer::TokenList innerTokens;
@@ -332,7 +332,7 @@ Undef TucanScript::Compiler::ProcStatement (Lexer::TokenList& inTokens, SInt32& 
 Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, VarSet& varSet, Boolean externalContext, Boolean innerExpr) {
 	Stack<SInt32> rawTokenStack;
 	auto rAddressT = externalContext ? VM::RADDRESS_T : VM::LRADDRESS_T;
-	const Size numTokens = expressionTokens.size ();
+	const SInt64 numTokens = expressionTokens.size ();
 	for (SInt32 iToken = Zero; iToken < numTokens; iToken++) {
 		auto& token = expressionTokens[iToken];
 		auto  tokenType = token.m_Type;
@@ -345,8 +345,19 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 				break;
 			}
 			case Lexer::TokenType::STR: {
-				if (const String* strValuePtr = std::get_if<String> (&token.m_Val)) {
-					StringAlloc (*strValuePtr);
+				const String* strValuePtr = std::get_if<String> (&token.m_Val);
+				if (strValuePtr) {
+					SInt32 iNext = NextWord (iToken);
+					if (iNext < numTokens) {
+						if (expressionTokens[iNext].m_Type Is Lexer::TokenType::CSTR) {
+							StringAlloc (*strValuePtr, true);
+							iNext++;
+						}
+						else StringAlloc (*strValuePtr, false);
+					}
+					else {
+						StringAlloc (*strValuePtr, false);
+					}
 				}
 				break;
 			}
@@ -514,7 +525,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 	if (!m_Instructions.empty ()) {
 		auto& lastOp = m_Instructions[PrevWord (m_Instructions.size ())];
 		if (!innerExpr) {
-			if ((lastOp.m_Op Is VM::MEMCPY || lastOp.m_Op Is VM::MEMSTORE)) {
+			if ((lastOp.m_Op Is VM::MEMCPY || lastOp.m_Op Is VM::MEMSTORE || lastOp.m_Op Is VM::PIN)) {
 				Op (VM::POP);
 			}
 		}

@@ -98,8 +98,8 @@ namespace TucanScript {
 
 	typedef UInt8 Bitmask;
 
-	typedef UInt64 QWORD;
-	typedef UInt32 DWORD;
+	typedef UInt64 QWord;
+	typedef UInt32 DWord;
 
 	template <typename T>
 	struct MemoryView final {

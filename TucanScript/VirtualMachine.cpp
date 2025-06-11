@@ -131,26 +131,33 @@ const VM::Managed& TucanScript::VM::VMAllocator::End () {
 }
 
 VM::Managed* TucanScript::VM::VMAllocator::Alloc (UInt64 size) {
-	auto* allocated = new Managed {
-		.m_Memory = (Val*) std::malloc (size * sizeof (Val)),
-		.m_Size = size,
-		.m_Next = nullptr,
-		.m_Previous = m_End
+	MemoryVariant memory {
+		.m_AlignedMemory = (Val*) std::malloc (size * sizeof (Val))
 	};
 
-	if (m_End) {
-		m_End->m_Next = allocated;
-	}
+	auto* allocated = new Managed {
+		.m_MemoryType = ALIGNED_MEMORY_T,
+		.m_Memory     = memory,
+		.m_Size       = size,
+		.m_Next       = nullptr,
+		.m_Previous   = m_End
+	};
 
-	m_End = allocated;
+	return Pin (allocated);
+}
 
-	if (!m_Begin) {
-		m_Begin = allocated;
-	}
+VM::Managed* TucanScript::VM::VMAllocator::Alloc (Undef* rawMemory, Size size) {
+	MemoryVariant memory { .m_RawMemory = rawMemory };
 
-	m_NumBlocks++;
+	auto* allocated = new Managed {
+		.m_MemoryType = RAW_MEMORY_T,
+		.m_Memory     = memory,
+		.m_Size       = size,
+		.m_Next       = nullptr,
+		.m_Previous   = m_End
+	};
 
-	return allocated;
+	return Pin (allocated);
 }
 
 Undef TucanScript::VM::VMAllocator::Free (Managed* ptr, Boolean removeReferences) {
@@ -171,14 +178,17 @@ Undef TucanScript::VM::VMAllocator::Free (Managed* ptr, Boolean removeReferences
 		m_End = prevPtr;
 	}
 
-	for (SInt32 iValue = Zero; removeReferences && iValue < ptr->m_Size; ++iValue) {
-		auto& value = ptr->m_Memory[iValue];
-		if (value.m_Type == MANAGED_T) {
-			RemoveRef (value.m_Data.m_ManagedPtr);
+	if (ptr->m_MemoryType == ALIGNED_MEMORY_T) {
+		for (SInt32 iValue = Zero; removeReferences && iValue < ptr->m_Size; ++iValue) {
+			auto& value = ptr->m_Memory.m_AlignedMemory[iValue];
+			if (value.m_Type == MANAGED_T) {
+				RemoveRef (value.m_Data.m_ManagedPtr);
+			}
 		}
 	}
 
-	std::free (ptr->m_Memory);
+	std::free (ptr->m_Memory.m_RawMemory);
+
 	m_NumBlocks--;
 
 	delete ptr;
@@ -273,6 +283,10 @@ Undef TucanScript::VM::VirtualMachine::StrOp (VMStack& stack, const Val& a, cons
 }
 
 Sym* TucanScript::VM::VirtualMachine::GetCStr (const Managed* managedMemory) {
+	if (managedMemory->m_MemoryType == RAW_MEMORY_T) {
+		return (Sym*) managedMemory->m_Memory.m_RawMemory;
+	}
+
 	const Size strLength = managedMemory->m_Size;
 
 	if (strLength == Zero) {
@@ -286,7 +300,7 @@ Sym* TucanScript::VM::VirtualMachine::GetCStr (const Managed* managedMemory) {
 
 	cStr[strLength] = Zero;
 	for (SInt32 iSym = Zero; iSym < strLength; iSym++) {
-		cStr[iSym] = managedMemory->m_Memory[iSym].m_Data
+		cStr[iSym] = managedMemory->m_Memory.m_AlignedMemory[iSym].m_Data
 		#if CHAR_MIN < Zero
 			.m_C;
 		#else
@@ -300,7 +314,7 @@ Undef TucanScript::VM::VirtualMachine::AllocStr (VMStack& stack, Sym* buffer, Si
 	auto* memory = m_Allocator.Alloc (size);
 
 	for (Size iSym = Zero; iSym < size; iSym++) {
-		memory->m_Memory[iSym] = Val {
+		memory->m_Memory.m_AlignedMemory[iSym] = Val {
 		#if CHAR_MIN < Zero
 			.m_Type = CHAR_T,
 			.m_Data = Word {
@@ -358,10 +372,6 @@ switch ((AVAL).m_Type) {                                            \
 	break;                                                          \
 }
 
-#define _Success 0x1ll
-#define _Fail    -(_Success)
-#define _Exit    _Fail
-
 #define InvalidStackPopVal "Invalid stack popped value type!"
 TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr, VMStack& stack, JmpMemory& frame) {
 	auto& instruction = m_Asm.m_Memory[qInstr];
@@ -396,7 +406,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			break;
 		}
 		case JMPR: {
-			DoRecordJump (qInstr, qInstr, stack, &frame);
+			DoRecordJump (qInstr, instruction, stack, &frame);
 			break;
 		}
 		case CALLASYNC: {
@@ -406,7 +416,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			frameArgs.m_SrcFrame  = &frame;
 			frameArgs.m_DestFrame = &asyncTask->m_Frame;
 
-			DoRecordJump (asyncTask->m_qInstr, qInstr, stack, frameArgs);
+			DoRecordJump (asyncTask->m_qInstr, instruction, stack, frameArgs);
 			asyncTask->m_qInstr++;
 			break;
 		}
@@ -459,7 +469,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 
 			if (src.m_Type Is MANAGED_T) {
 				auto* managedMemory = src.m_Data.m_ManagedPtr;
-				stack.Push (managedMemory->m_Memory[id.m_Data.m_U64]);
+				stack.Push (managedMemory->m_Memory.m_AlignedMemory[id.m_Data.m_U64]);
 				m_Allocator.HandleReferences (managedMemory);
 			}
 			else {
@@ -476,7 +486,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 
 			if (auto* memory = GetMemoryAtAddress (frame, dest, nullptr)) {
 				if (memory->m_Type Is MANAGED_T) {
-					MemCopy (stack, &frame, memory->m_Data.m_ManagedPtr->m_Memory[id.m_Data.m_U64], src, true);
+					MemCopy (stack, &frame, memory->m_Data.m_ManagedPtr->m_Memory.m_AlignedMemory[id.m_Data.m_U64], src, true);
 				}
 			}
 			else {
@@ -487,9 +497,32 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			break;
 		}
 		case STRALLOC: {
-			auto* cStr = (Sym*)(*m_GlobalDeallocator)[instruction.m_Val.m_Data.m_U64];
+			auto* cStr = (Sym*) (*m_GlobalDeallocator)[instruction.m_Val.m_Data.m_U64];
 			auto strLength = std::strlen (cStr);
 			AllocStr (stack, cStr, strLength);
+			break;
+		}
+		case CSTRALLOC: {
+			auto* cStr = (Sym*)(*m_GlobalDeallocator)[instruction.m_Val.m_Data.m_U64];
+			const auto strLength = std::strlen (cStr);
+
+			Sym* cStrCpy = (Sym*) std::malloc (NextWord (strLength));
+
+			if (!cStrCpy) {
+				LogInstErr (nameof (CSTRALLOC), "Failed to allocate new string!");
+				Free ();
+				return _Fail;
+			}
+
+			std::strcpy (cStrCpy, cStr);
+
+			stack.Push (Val {
+				.m_Type = NATIVEPTR_T,
+				.m_Data =
+					Word {
+						.m_NativePtr = cStrCpy
+					}
+				});
 			break;
 		}
 		case SEQUENCEALLOC: {
@@ -501,7 +534,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 				if (poppedValue.m_Type Is MANAGED_T) {
 					poppedValue.m_Data.m_ManagedPtr->m_RefCount++;
 				}
-				memory->m_Memory[iElement] = poppedValue;
+				memory->m_Memory.m_AlignedMemory[iElement] = poppedValue;
 			}
 
 			stack.Push (Val {
@@ -510,7 +543,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 					Word {
 						.m_ManagedPtr = memory
 					}
-						  });
+				});
 			break;
 		}
 		case CMEMALLOC: {
@@ -518,9 +551,9 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 				.m_Type = NATIVEPTR_T,
 				.m_Data =
 					Word {
-							.m_NativePtr = std::malloc (PopUnpack (stack, frame).m_Data.m_U64)
+						.m_NativePtr = std::malloc (PopUnpack (stack, frame).m_Data.m_U64)
 					}
-						  });
+				});
 			break;
 		}
 		case MEMALLOC: {
@@ -528,9 +561,9 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 				.m_Type = MANAGED_T,
 				.m_Data =
 					Word {
-							.m_ManagedPtr = m_Allocator.Alloc (PopUnpack (stack, frame).m_Data.m_U64)
+						.m_ManagedPtr = m_Allocator.Alloc (PopUnpack (stack, frame).m_Data.m_U64)
 					}
-						  });
+				});
 			break;
 		}
 		case MEMAPPEND: {
@@ -541,11 +574,11 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 				auto* managedMemory = memoryHolder.m_Data.m_ManagedPtr;
 
 				const UInt64 newSize = (NextWord (managedMemory->m_Size)) * sizeof (Val);
-				auto newMemory = std::realloc (managedMemory->m_Memory, newSize);
+				auto newMemory = std::realloc (managedMemory->m_Memory.m_AlignedMemory, newSize);
 
 				if (newMemory) {
-					managedMemory->m_Memory = (Val*)newMemory;
-					managedMemory->m_Memory[managedMemory->m_Size++] = newElement;
+					managedMemory->m_Memory.m_AlignedMemory = (Val*) newMemory;
+					managedMemory->m_Memory.m_AlignedMemory[managedMemory->m_Size++] = newElement;
 				}
 				else {
 					LogInstErr (nameof (MEMAPPEND), "Failed to realloc!");
@@ -766,12 +799,12 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			auto managedMemory = m_Allocator.Alloc (aLength + bLength);
 
 			for (UInt64 iCharA = Zero; iCharA < aLength; iCharA++) {
-				managedMemory->m_Memory[iCharA] = a.m_Data.m_ManagedPtr->m_Memory[iCharA];
+				managedMemory->m_Memory.m_AlignedMemory[iCharA] = a.m_Data.m_ManagedPtr->m_Memory.m_AlignedMemory[iCharA];
 			}
 			m_Allocator.HandleReferences (a.m_Data.m_ManagedPtr);
 
 			for (UInt64 iCharB = Zero; iCharB < bLength; iCharB++) {
-				managedMemory->m_Memory[iCharB + aLength] = b.m_Data.m_ManagedPtr->m_Memory[iCharB];
+				managedMemory->m_Memory.m_AlignedMemory[iCharB + aLength] = b.m_Data.m_ManagedPtr->m_Memory.m_AlignedMemory[iCharB];
 			}
 			m_Allocator.HandleReferences (b.m_Data.m_ManagedPtr);
 
@@ -859,16 +892,44 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			delete[] args.m_Memory;
 			break;
 		}
+		case PIN: {
+			SInt32 nArgs = PopUnpack (stack, frame).m_Data.m_I32;
+
+			Undef* memory     = nullptr;
+			Size   memorySize = Zero;
+
+			if (nArgs < 2) {
+				memory = PopUnpack (stack, frame).m_Data.m_NativePtr;
+				memorySize = std::strlen (reinterpret_cast<Sym*>(memory));
+			}
+			else {
+				memorySize = PopUnpack (stack, frame).m_Data.m_U64;
+				memory = PopUnpack (stack, frame).m_Data.m_NativePtr;
+			}
+
+			stack.Push (Val {
+				.m_Type = MANAGED_T,
+				.m_Data = Word {
+					.m_ManagedPtr = m_Allocator.Alloc (memory, memorySize)
+				}
+			});
+			break;
+		}
+		case GETRAWMEM: {
+			stack.Push (PopUnpack (stack, frame).m_Data.m_ManagedPtr->m_Memory.m_RawMemory);
+			break;
+		}
 		case SETTASKPROPS: {
 			m_TaskPool.m_TaskMemoryProps.m_CallDepth = PopUnpack (stack, frame).m_Data.m_U64;
 			m_TaskPool.m_TaskMemoryProps.m_StackSize = PopUnpack (stack, frame).m_Data.m_U64;
+			break;
 		}
 	}
 
 	return _Success;
 }
 
-Undef TucanScript::VM::VirtualMachine::DoRecordJump (SInt64& qContextInstr, SInt64& qTargetInstr, VMStack& stack, const MemCpyFrameArgs& frameArgs) {
+Undef TucanScript::VM::VirtualMachine::DoRecordJump (SInt64& qContextInstr, Instruction& jmpInstr, VMStack& stack, const MemCpyFrameArgs& frameArgs) {
 	GetLastCall (*frameArgs.m_DestFrame).m_Address = NextWord (qContextInstr);
 	frameArgs.m_DestFrame->m_Depth++;
 
@@ -876,8 +937,11 @@ Undef TucanScript::VM::VirtualMachine::DoRecordJump (SInt64& qContextInstr, SInt
 	const SInt32 numArgs = PopUnpack (stack, *frameArgs.m_SrcFrame).m_Data.m_I32;
 
 	auto& callMemory = GetLastCall (*frameArgs.m_DestFrame).m_Memory;
-	callMemory.m_Memory = new Val[callMemorySize];
 	callMemory.m_Size = callMemorySize;
+
+	if (callMemorySize > Zero) {
+		callMemory.m_Memory = new Val[callMemorySize];
+	}
 
 	for (SInt32 iArg = PrevWord (numArgs); iArg >= Zero; iArg--) {
 		auto arg = ValUtility::_DWORD_signed_raw (&iArg, false);
@@ -885,7 +949,7 @@ Undef TucanScript::VM::VirtualMachine::DoRecordJump (SInt64& qContextInstr, SInt
 		MemCopy (stack, frameArgs, arg, stack.Pop (), false);
 	}
 
-	Jmp (qContextInstr, m_Asm.m_Memory[qTargetInstr]);
+	Jmp (qContextInstr, jmpInstr);
 }
 
 TucanScript::VM::VirtualMachine::VirtualMachine (
@@ -905,7 +969,8 @@ TucanScript::VM::VirtualMachine::VirtualMachine (
 	m_FixedMemory {
 		.m_Memory = new Val[fixedMemSize],
 		.m_Size   = fixedMemSize
-	} {
+	},
+    m_IPtr { Zero } {
 	m_JmpMemory.ZeroOutMemory ();
 }
 
@@ -913,27 +978,12 @@ TucanScript::VM::VirtualMachine::~VirtualMachine () {
 	Free ();
 }
 
-Undef TucanScript::VM::VirtualMachine::Run (SInt64 entryPoint) {
-	for (SInt64 qInstr = entryPoint; static_cast<QWORD>(qInstr) < m_Asm.m_Size && !m_Free; ++qInstr) {
-		if (HandleInstr (qInstr, m_Stack, m_JmpMemory) == _Exit) {
+Undef TucanScript::VM::VirtualMachine::Run () {
+	while (!IPtrIsOutOfProgram ()) {
+		if (!Next ()) 
 			break;
-		}
-		for (QWORD qTask = Zero; qTask < m_TaskPool.GetCapacity (); qTask++) {
-			lpTask task = m_TaskPool.GetTask (qTask);
-			if (task->m_Running) {
-				if (HandleInstr (task->m_qInstr, *task->m_Stack, task->m_Frame) == _Exit) {
-					task->m_Running = false;
-					delete task->m_Stack;
-					task->m_Stack = nullptr;
-					task->m_Frame.Free ();
-				}
-				else {
-					task->m_qInstr++;
-				}
-			}
-		}
+		NextCoroutineStep ();
 	}
-	Free ();
 }
 
 Undef TucanScript::VM::VirtualMachine::Free () {
@@ -949,9 +999,65 @@ Undef TucanScript::VM::VirtualMachine::Free () {
 	m_Free = true;
 }
 
+Undef TucanScript::VM::VirtualMachine::NextCoroutineStep () {
+	for (QWord qTask = Zero; qTask < m_TaskPool.GetCapacity (); qTask++) {
+		lpTask task = m_TaskPool.GetTask (qTask);
+		if (task->m_Running) {
+			if (HandleInstr (task->m_qInstr, *task->m_Stack, task->m_Frame) == _Exit) {
+				task->m_Running = false;
+				delete task->m_Stack;
+				task->m_Stack = nullptr;
+				task->m_Frame.Free ();
+			}
+			else {
+				task->m_qInstr++;
+			}
+		}
+	}
+}
+
+Undef TucanScript::VM::VirtualMachine::WaitForYield () {
+	const Size schedulerCapacity = m_TaskPool.GetCapacity ();
+	Size cxComTasks { Zero };
+	while (cxComTasks < schedulerCapacity) {
+		cxComTasks = Zero;
+		for (QWord qTask = Zero; qTask < schedulerCapacity; qTask++) {
+			lpTask task = m_TaskPool.GetTask (qTask);
+
+			if (!task->m_Running) {
+				++cxComTasks;
+				continue;
+			}
+
+			const auto& instr = m_Asm.m_Memory[task->m_qInstr];
+			if (instr.m_Op != YIELD) {
+				if (HandleInstr (task->m_qInstr, *task->m_Stack, task->m_Frame) == _Exit) {
+					task->m_Running = false;
+					delete task->m_Stack;
+					task->m_Stack = nullptr;
+					task->m_Frame.Free ();
+					++cxComTasks;
+				}
+				else {
+					++task->m_qInstr;
+				}
+			}
+			else {
+				++cxComTasks;
+			}
+		}
+	}
+	for (QWord qTask = Zero; qTask < schedulerCapacity; ++qTask) {
+		lpTask task = m_TaskPool.GetTask (qTask);
+		if (task->m_Running && m_Asm.m_Memory[task->m_qInstr].m_Op == YIELD) {
+			++task->m_qInstr;
+		}
+	}
+}
+
 Undef TucanScript::VM::TaskPool::Resize (Size newCapacity) {
 	lpTask* newArray = new lpTask[newCapacity];
-	for (QWORD qTask = Zero; qTask < Min(m_Capacity, newCapacity); ++qTask) {
+	for (QWord qTask = Zero; qTask < Min(m_Capacity, newCapacity); ++qTask) {
 		newArray[qTask] = m_Tasks[qTask];
 	}
 	delete[] m_Tasks;
@@ -959,10 +1065,10 @@ Undef TucanScript::VM::TaskPool::Resize (Size newCapacity) {
 	m_Capacity = newCapacity;
 }
 
-TucanScript::VM::lpTask TucanScript::VM::TaskPool::Run (QWORD qInstr) {
+TucanScript::VM::lpTask TucanScript::VM::TaskPool::Run (QWord qInstr) {
 	const Size frameBufferSize = NextWord (m_TaskMemoryProps.m_CallDepth);
 	lpTask task;
-	for (QWORD qTask = Zero; qTask < m_Capacity; qTask++) {
+	for (QWord qTask = Zero; qTask < m_Capacity; qTask++) {
 		task = m_Tasks[qTask];;
 		if (!task->m_Running) {
 			task->m_Running = true;
@@ -995,7 +1101,7 @@ TucanScript::VM::lpTask TucanScript::VM::TaskPool::Run (QWORD qInstr) {
 }
 
 Undef TucanScript::VM::TaskPool::Free () {
-	for (QWORD qTask = Zero; qTask < m_Capacity; ++qTask) {
+	for (QWord qTask = Zero; qTask < m_Capacity; ++qTask) {
 		lpTask task = m_Tasks[qTask];
 		delete task->m_Stack;
 		task->m_Frame.Free ();

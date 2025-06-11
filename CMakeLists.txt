@@ -30,9 +30,11 @@ add_executable (trt
 			 TucanScript/Compiler.h TucanScript/Compiler.cpp 
 			 TucanScript/BinaryBuilder.h TucanScript/BinaryBuilder.cpp)
 
-add_library (TucanScript SHARED
+add_library (TucanScript STATIC
 			 TucanScript/Utility.h
 			 TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp 
 			 TucanScript/Lexer.h TucanScript/Lexer.cpp 
 			 TucanScript/Compiler.h TucanScript/Compiler.cpp 
 			 TucanScript/BinaryBuilder.h TucanScript/BinaryBuilder.cpp)
+
+target_include_directories(TucanScript PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

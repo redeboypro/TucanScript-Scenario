@@ -56,7 +56,7 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 
 	atexit (FreeVM);
 
-	vm->Run (Zero);
+	vm->Run ();
 
 	delete vm;
 	return Zero;

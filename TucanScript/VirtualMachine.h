@@ -5,6 +5,10 @@
 
 #define LogInstErr(INST, MSG)  std::cerr << INST ": " MSG << std::endl
 
+#define _Success 0x1ll
+#define _Fail    -(_Success)
+#define _Exit    _Fail
+
 namespace TucanScript::VM {
 	union  Word;
 	struct Val;
@@ -30,6 +34,7 @@ namespace TucanScript::VM {
 		MEMLOAD,
 		MEMSTORE,
 		STRALLOC,
+		CSTRALLOC,
 		SEQUENCEALLOC,
 		MEMAPPEND,
 		MEMALLOC,
@@ -82,7 +87,11 @@ namespace TucanScript::VM {
 		DOEXCALL,
 		GETMOD,
 
-		SETTASKPROPS
+		GETRAWMEM,
+		PIN,
+
+		SETTASKPROPS,
+		YIELD //Experimental
 	};
 
 	enum ValType : UInt8 {
@@ -175,12 +184,20 @@ namespace TucanScript::VM {
 		};
 	};
 
+	union MemoryVariant {
+		Val*   m_AlignedMemory;
+		Undef* m_RawMemory;
+	};
+
+	enum ManagedType { ALIGNED_MEMORY_T, RAW_MEMORY_T };
+
 	struct Managed final {
-		Val*     m_Memory;
-		UInt64   m_Size;
-		SInt32   m_RefCount;
-		Managed* m_Next;
-		Managed* m_Previous;
+		ManagedType   m_MemoryType;
+		MemoryVariant m_Memory;
+		UInt64        m_Size;
+		SInt32        m_RefCount;
+		Managed*      m_Next;
+		Managed*      m_Previous;
 	};
 
 	struct Instruction final {
@@ -212,7 +229,7 @@ namespace TucanScript::VM {
 			if (!m_Sequence)
 				return;
 
-			for (QWORD qCall = Zero; qCall < m_Capacity; qCall++) {
+			for (QWord qCall = Zero; qCall < m_Capacity; qCall++) {
 				m_Sequence[qCall].m_Memory.m_Memory = nullptr;
 			}
 		}
@@ -221,7 +238,7 @@ namespace TucanScript::VM {
 			if (!m_Sequence)
 				return;
 
-			for (QWORD qCall = Zero; qCall < m_Capacity; qCall++) {
+			for (QWord qCall = Zero; qCall < m_Capacity; qCall++) {
 				Call& call = m_Sequence[qCall];
 				delete[] call.m_Memory.m_Memory;
 				call.m_Memory.m_Memory = nullptr;
@@ -297,6 +314,22 @@ namespace TucanScript::VM {
 		Managed* m_End;
 		UInt64   m_NumBlocks { Zero };
 
+		inline Managed* Pin (Managed* allocated) {
+			if (m_End) {
+				m_End->m_Next = allocated;
+			}
+
+			m_End = allocated;
+
+			if (!m_Begin) {
+				m_Begin = allocated;
+			}
+
+			m_NumBlocks++;
+
+			return allocated;
+		}
+
 	public:
 		VMAllocator ();
 
@@ -304,6 +337,8 @@ namespace TucanScript::VM {
 		const Managed& End ();
 
 		Managed* Alloc (UInt64 size);
+		Managed* Alloc (Undef* rawMemory, Size size);
+
 		Undef Free (Managed* ptr, Boolean removeReferences = true);
 
 		inline Undef RemoveRef (Managed* ptr) {
@@ -347,13 +382,13 @@ namespace TucanScript::VM {
 			Free ();
 		}
 
-		lpTask Run (QWORD qInstr);
+		lpTask Run (QWord qInstr);
 
 		constexpr Size GetCapacity () const {
 			return m_Capacity;
 		}
 
-		lpTask GetTask (QWORD qTask) const {
+		lpTask GetTask (QWord qTask) const {
 			return m_Tasks[qTask];
 		}
 
@@ -379,6 +414,7 @@ namespace TucanScript::VM {
 		JmpMemory          m_JmpMemory;
 		TaskPool           m_TaskPool;
 		Boolean            m_Free {};
+		SInt64             m_IPtr;
 
 		VM::Val Unpack (JmpMemory& frame, const Val& value) const;
 		VM::Val PopUnpack (VMStack& stack, JmpMemory& frame);
@@ -388,7 +424,7 @@ namespace TucanScript::VM {
 			return jmpMemory.m_Sequence[jmpMemory.m_Depth];
 		}
 
-		VM::Val * GetMemoryAtAddress (JmpMemory& frame, const Val& src, Val* defaultValue) const;
+		VM::Val* GetMemoryAtAddress (JmpMemory& frame, const Val& src, Val* defaultValue) const;
 
 		inline UInt64 GetMemorySize (const Val& value) const {
 			return value.m_Data.m_ManagedPtr->m_Size;
@@ -508,8 +544,15 @@ namespace TucanScript::VM {
 				break;
 				case MANAGED_T: {
 					auto* managedPtr = value.m_Data.m_ManagedPtr;
-					for (SInt32 iElement = Zero; iElement < managedPtr->m_Size; iElement++) {
-						Print (managedPtr->m_Memory[iElement], false, false);
+
+					if (managedPtr->m_MemoryType == ALIGNED_MEMORY_T) {
+						for (SInt32 iElement = Zero; iElement < managedPtr->m_Size; iElement++) {
+							Print (managedPtr->m_Memory.m_AlignedMemory[iElement], false, false);
+						}
+					}
+					else {
+						std::cout << (Sym*) managedPtr->m_Memory.m_RawMemory;
+						std::flush (std::cout);
 					}
 
 					if (handleReferences) {
@@ -538,9 +581,11 @@ namespace TucanScript::VM {
 		Sym* GetCStr (const Managed* managedMemory);
 		Undef AllocStr(VMStack& stack, Sym* buffer, Size size);
 
-		Undef DoRecordJump(SInt64& qContextInstr, SInt64& qTargetInstr, VMStack& stack, const MemCpyFrameArgs & frameArgs);
-
 		TucanScript::SInt32 HandleInstr (SInt64& qInstr, VMStack& stack, JmpMemory& frame);
+
+		Undef DoRecordJump(SInt64& qContextInstr, Instruction& jmpInstr,
+			VMStack& stack,
+			const MemCpyFrameArgs& frameArgs);
 
 	public:
 		VirtualMachine (
@@ -552,8 +597,58 @@ namespace TucanScript::VM {
 
 		~VirtualMachine ();
 
-		Undef Run (SInt64 entryPoint = Zero);
+		Undef Run ();
 		Undef Free ();
+
+		Undef NextCoroutineStep ();
+
+		inline Undef ForceCall (SInt64 destInstrPtr) {
+			Instruction jmpInstr {
+				.m_Op  = JMPR,
+				.m_Val = Val {
+					.m_Type = ValType::INT64_T,
+					.m_Data = Word {
+						.m_I64 = destInstrPtr
+					}
+				}
+			};
+			DoRecordJump (m_IPtr, jmpInstr, m_Stack, &m_JmpMemory);
+			Skip ();
+		}
+
+		Undef WaitForYield ();
+
+		inline Boolean Next () {
+			if (HandleInstr (m_IPtr, m_Stack, m_JmpMemory) == _Exit) {
+				return false;
+			}
+			else {
+				m_IPtr++;
+				return true;
+			}
+		}
+
+		inline Boolean Skip () {
+			if (!IPtrIsOutOfProgram ()) {
+				m_IPtr++;
+				return true;
+			}
+			else {
+				return false;
+			}
+		}
+
+		inline Boolean IPtrIsOutOfProgram () const {
+			return m_IPtr < Zero || m_IPtr >= m_Asm.m_Size || m_Free;
+		}
+
+		inline Undef ForceExitProgram () { 
+			m_IPtr = _Exit; 
+		}
+
+		inline Undef WriteChunk (Size qChunkPtr, const Val& chunkVal) {
+			m_FixedMemory.m_Memory[qChunkPtr] = chunkVal;
+		}
 
 		VMStack* GetStack () { return &m_Stack; };
 	};

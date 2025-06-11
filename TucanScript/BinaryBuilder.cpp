@@ -25,7 +25,7 @@ Undef TucanScript::Binary::BinaryBuilder::Decompose (const String& inFilePath, V
     inFileStream.close ();
 
     //Literals processing
-    QWORD qCaret = 1;
+    QWord qCaret = 1;
     Sym verificationToken = buffer[Zero];
     if (verificationToken != VERIFICATION_HEADER) {
         LogErr ("Invalid verification token!");
@@ -97,7 +97,7 @@ Undef TucanScript::Binary::BinaryBuilder::Build (
     }
 
     Sym* buffer = new Sym[totalSize];
-    QWORD qCaret = Zero;
+    QWord qCaret = Zero;
 
     buffer[qCaret++] = VERIFICATION_HEADER;
 

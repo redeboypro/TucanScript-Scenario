@@ -29,12 +29,12 @@ namespace TucanScript {
 		VarSet         m_DefinedVars;
 		SInt32         m_NumArgs {};
 		SInt64         m_Address {};
-		Vector<QWORD>  m_Calls {};
+		Vector<QWord>  m_Calls {};
 	};
 
 	struct WhileInfo final {
-		QWORD         m_Entry {};
-		Vector<QWORD> m_BreakPoints;
+		QWord         m_Entry {};
+		Vector<QWord> m_BreakPoints;
 	};
 
 	struct InvokableOp final {
@@ -152,7 +152,7 @@ namespace TucanScript {
 			});
 		}
 
-		inline Undef Alloc (QWORD size) {
+		inline Undef Alloc (QWord size) {
 			m_Instructions.push_back (VM::Instruction {
 				.m_Op  = VM::SEQUENCEALLOC,
 				.m_Val = VM::Val {
@@ -164,15 +164,15 @@ namespace TucanScript {
 			});
 		}
 
-		inline Undef StringAlloc (const String& str) {
-			auto address = static_cast<QWORD>(Found (m_StringLiterals, str));
+		inline Undef StringAlloc (const String& str, Boolean native) {
+			auto address = static_cast<QWord>(Found (m_StringLiterals, str));
 			if (!IsValidID (address)) {
 				address = m_StringLiterals.size ();
 				m_StringLiterals.push_back (str);
 			}
 
 			m_Instructions.push_back (VM::Instruction {
-				.m_Op  = VM::STRALLOC,
+				.m_Op  = native ? VM::CSTRALLOC : VM::STRALLOC,
 				.m_Val = VM::Val {
 					.m_Type = VM::UINT64_T,
 					.m_Data = VM::Word {
@@ -190,8 +190,8 @@ namespace TucanScript {
 			});
 		}
 
-		inline VM::Val GetInstrEnd (QWORD offset = Zero) {
-			QWORD instrWord = m_Instructions.size () + offset;
+		inline VM::Val GetInstrEnd (QWord offset = Zero) {
+			QWord instrWord = m_Instructions.size () + offset;
 			return VM::ValUtility::_QWORD_signed_raw (&instrWord, true);
 		}
 
@@ -279,6 +279,8 @@ namespace TucanScript {
 			{ "PopStack",        VM::POP },
 			{ "SetTaskProps",    VM::SETTASKPROPS },
 			{ "Alloc",           VM::MEMALLOC },
+			{ "Pin",             { VM::PIN, true } },
+			{ "GetRawPtr",       VM::GETRAWMEM },
 			{ "Append",          VM::MEMAPPEND },
 			{ "Free",            VM::MEMDEALLOC },
 			{ "Size",            VM::MEMSIZE },
@@ -295,6 +297,7 @@ namespace TucanScript {
 			//Native wrapping
 			{ "LoadLibrary",     VM::LOADLIB },
 			{ "GetProcAddr",     VM::LOADSYM },
+			{ "Yield",           VM::YIELD },
 		};
 
 		const Dictionary<VM::OpCode, String> OpDebugMap {
@@ -311,6 +314,7 @@ namespace TucanScript {
 			{VM::MEMSTORE,      "MemoryStore"},
 			{VM::MEMAPPEND,     "MemoryAppend"},
 			{VM::STRALLOC,      "MemoryAlloc (String)"},
+			{VM::CSTRALLOC,     "NativeMemoryAlloc (String)"},
 			{VM::SEQUENCEALLOC, "MemoryAlloc (Sequence)"},
 			{VM::CMEMALLOC,     "NativeMemoryAlloc"},
 			{VM::MEMALLOC,      "MemoryAlloc"},
@@ -352,7 +356,10 @@ namespace TucanScript {
 			{VM::LOADLIB,       "LoadLibrary"},
 			{VM::LOADSYM,       "LoadSym"},
 			{VM::DOEXCALL,      "ExternalCall"},
+			{VM::PIN,           "PinMemoryChunk"},
+			{VM::GETRAWMEM,     "GetRawMemoryPtr"},
 			{VM::SETTASKPROPS,  "SetTaskAllocProps"},
+			{VM::YIELD,         "Yield"}
 		};
 
 	public:
@@ -364,6 +371,24 @@ namespace TucanScript {
 					m_Instructions[inst].m_Val.m_Data.m_I64 = funInfo.m_Address;
 				}
 			}
+		}
+
+		inline Undef DefineVar (const String& variableName) {
+			m_DefinedVars.push_back (variableName);
+		}
+
+		inline Undef LogFuncTable () {
+			for (auto& [funName, funInfo] : m_DefinedFuncs) {
+				Log (funName << ": " << funInfo.m_Address);
+			}
+		}
+		
+		inline SInt64 GetFuncAddr (const String& functionName) {
+			auto it = m_DefinedFuncs.find (functionName);
+			if (it != m_DefinedFuncs.end ()) {
+				return it->second.m_Address;
+			}
+			return InvalidID;
 		}
 
 		VM::ReadOnlyData GetReadOnlyData ();

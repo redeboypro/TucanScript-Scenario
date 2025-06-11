@@ -7,8 +7,6 @@ using namespace TucanScript;
 #define BinaryExt    ".tbin"
 
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
-	auto lexer = new Lexer::Tokenizer ();
-
 	if (nArgs <= 1) {
 		return nArgs;
 	}
@@ -22,6 +20,8 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 	if (nArgs > 2) {
 		includeDir = args[2];
 	}
+
+	auto lexer = new Lexer::Tokenizer ();
 
 	auto compiler = new Compiler ();
 	compiler->GenerateInstructionList (
