@@ -377,6 +377,16 @@ namespace TucanScript {
 			m_DefinedVars.push_back (variableName);
 		}
 
+		template<typename... Args>
+		inline Undef DefineFunc (const String& funName, const Args&... variables) {
+			static_assert((std::is_same_v<Args, String> && ...), "All arguments must be String");
+
+			FuncInfo fun {};
+			(fun.m_DefinedVars.push_back (variables), ...);
+
+			m_DefinedFuncs.emplace (funName, std::move (fun));
+		}
+
 		inline Undef LogFuncTable () {
 			for (auto& [funName, funInfo] : m_DefinedFuncs) {
 				Log (funName << ": " << funInfo.m_Address);

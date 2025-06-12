@@ -526,7 +526,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			break;
 		}
 		case SEQUENCEALLOC: {
-			auto size = instruction.m_Val.m_Data.m_U64;
+			auto  size = instruction.m_Val.m_Data.m_U64;
 			auto* memory = m_Allocator.Alloc (size);
 
 			for (SInt32 iElement = PrevWord (size); iElement >= Zero; iElement--) {
@@ -742,40 +742,28 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 	#if _WIN32
 		case PTR2DWORD: {
 			auto ptr = PopUnpack (stack, frame);
-			{
-				ptr.m_Type = UINT32_T;
-				ptr.m_Data.m_U32 = reinterpret_cast<UInt32> (ptr.m_Data.m_NativePtr);
-			}
+			ptr.m_Type = UINT32_T;
 			stack.Push (ptr);
 			break;
 		}
 	 #endif
 		case PTR2QWORD: {
 			auto ptr = PopUnpack (stack, frame);
-			{
-				ptr.m_Type = UINT64_T;
-				ptr.m_Data.m_U64 = reinterpret_cast<UInt64> (ptr.m_Data.m_NativePtr);
-			}
+			ptr.m_Type = UINT64_T;
 			stack.Push (ptr);
 			break;
 		}
 	#if _WIN32
 		case DWORD2PTR: {
 			auto ptr = PopUnpack (stack, frame);
-			{
-				ptr.m_Type = NATIVEPTR_T;
-				ptr.m_Data.m_NativePtr = reinterpret_cast<Undef*> (ptr.m_Data.m_U32);
-			}
+			ptr.m_Type = NATIVEPTR_T;
 			stack.Push (ptr);
 			break;
 		}
 	#endif
 		case QWORD2PTR: {
 			auto ptr = PopUnpack (stack, frame);
-			{
-				ptr.m_Type = NATIVEPTR_T;
-				ptr.m_Data.m_NativePtr = reinterpret_cast<Undef*> (ptr.m_Data.m_U64);
-			}
+			ptr.m_Type = NATIVEPTR_T;
 			stack.Push (ptr);
 			break;
 		}
