@@ -382,6 +382,7 @@ namespace TucanScript {
 			static_assert((std::is_same_v<Args, String> && ...), "All arguments must be String");
 
 			FuncInfo fun {};
+			fun.m_Address = InvalidID;
 			(fun.m_DefinedVars.push_back (variables), ...);
 
 			m_DefinedFuncs.emplace (funName, std::move (fun));

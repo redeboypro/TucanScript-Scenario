@@ -185,19 +185,19 @@ namespace TucanScript::VM {
 	};
 
 	union MemoryVariant {
-		Val*   m_AlignedMemory;
-		Undef* m_RawMemory;
+		Val*   m_hSpecBuf;
+		Undef* m_hRawBuf;
 	};
 
-	enum ManagedType { ALIGNED_MEMORY_T, RAW_MEMORY_T };
+	enum ManagedType { SPECIFIC_T, RAW_T };
 
 	struct Managed final {
 		ManagedType   m_MemoryType;
 		MemoryVariant m_Memory;
 		UInt64        m_Size;
 		SInt32        m_RefCount;
-		Managed*      m_Next;
-		Managed*      m_Previous;
+		Managed*      m_hNext;
+		Managed*      m_hPrevious;
 	};
 
 	struct Instruction final {
@@ -250,10 +250,7 @@ namespace TucanScript::VM {
 		}
 	};
 
-	enum UnsafeMemoryType : UInt8 {
-		STATIC_MEMORY,
-		NATIVE_LIBRARY
-	};
+	enum UnsafeMemoryType : UInt8 { READONLY_MEMORY, MODULE_HANDLE };
 
 	struct UnsafeMemory final {
 		UnsafeMemoryType m_Type;
@@ -310,22 +307,22 @@ namespace TucanScript::VM {
 	};
 
 	class VMAllocator final {
-		Managed* m_Begin;
-		Managed* m_End;
-		UInt64   m_NumBlocks { Zero };
+		Managed* m_hBegin;
+		Managed* m_hEnd;
+		UInt64   m_nBlocks { Zero };
 
 		inline Managed* Pin (Managed* allocated) {
-			if (m_End) {
-				m_End->m_Next = allocated;
+			if (m_hEnd) {
+				m_hEnd->m_hNext = allocated;
 			}
 
-			m_End = allocated;
+			m_hEnd = allocated;
 
-			if (!m_Begin) {
-				m_Begin = allocated;
+			if (!m_hBegin) {
+				m_hBegin = allocated;
 			}
 
-			m_NumBlocks++;
+			m_nBlocks++;
 
 			return allocated;
 		}
@@ -358,14 +355,14 @@ namespace TucanScript::VM {
 	struct Task final {
 		SInt64    m_qInstr;
 		Boolean   m_Running;
-		VMStack*  m_Stack;
+		VMStack*  m_hStack;
 		JmpMemory m_Frame;
 	};
 
-	using lpTask = Task*;
+	using HTask = Task*;
 
 	class TaskPool final {
-		lpTask* m_Tasks { nullptr };
+		HTask*  m_Tasks { nullptr };
 		Size    m_Capacity { Zero };
 
 		typedef struct {
@@ -382,13 +379,13 @@ namespace TucanScript::VM {
 			Free ();
 		}
 
-		lpTask Run (QWord qInstr);
+		HTask Run (QWord qInstr);
 
 		constexpr Size GetCapacity () const {
 			return m_Capacity;
 		}
 
-		lpTask GetTask (QWord qTask) const {
+		HTask GetTask (QWord qTask) const {
 			return m_Tasks[qTask];
 		}
 
@@ -398,18 +395,18 @@ namespace TucanScript::VM {
 	};
 
 	struct MemCpyFrameArgs final {
-		JmpMemory* m_SrcFrame { nullptr };
-		JmpMemory* m_DestFrame { nullptr };
+		JmpMemory* m_hSrcFrame { nullptr };
+		JmpMemory* m_hDestFrame { nullptr };
 
 		MemCpyFrameArgs () = default;
-		MemCpyFrameArgs (JmpMemory* ptr) : m_SrcFrame (ptr), m_DestFrame (ptr) {}
+		MemCpyFrameArgs (JmpMemory* ptr) : m_hSrcFrame (ptr), m_hDestFrame (ptr) {}
 	};
 
 	class VirtualMachine final {
 		VMStack            m_Stack;
 		VMAllocator        m_Allocator;
 		Asm                m_Asm;
-		UnsafeDeallocator* m_GlobalDeallocator;
+		UnsafeDeallocator* m_hGlobalDeallocator;
 		ValMem             m_FixedMemory;
 		JmpMemory          m_JmpMemory;
 		TaskPool           m_TaskPool;
@@ -545,13 +542,13 @@ namespace TucanScript::VM {
 				case MANAGED_T: {
 					auto* managedPtr = value.m_Data.m_ManagedPtr;
 
-					if (managedPtr->m_MemoryType == ALIGNED_MEMORY_T) {
+					if (managedPtr->m_MemoryType == SPECIFIC_T) {
 						for (SInt32 iElement = Zero; iElement < managedPtr->m_Size; iElement++) {
-							Print (managedPtr->m_Memory.m_AlignedMemory[iElement], false, false);
+							Print (managedPtr->m_Memory.m_hSpecBuf[iElement], false, false);
 						}
 					}
 					else {
-						std::cout << (Sym*) managedPtr->m_Memory.m_RawMemory;
+						std::cout << (Sym*) managedPtr->m_Memory.m_hRawBuf;
 						std::flush (std::cout);
 					}
 
@@ -593,7 +590,7 @@ namespace TucanScript::VM {
 			UInt64 fixedMemSize,
 			UInt64 callDepth,
 			Asm&& asm_,
-			UnsafeDeallocator* staticDeallocator);
+			UnsafeDeallocator* hStaticDeallocator);
 
 		~VirtualMachine ();
 
