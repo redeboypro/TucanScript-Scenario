@@ -273,6 +273,7 @@ namespace TucanScript {
 			{ "Pin",             { VM::PIN, true } },
 			{ "Pop",             VM::POP },
 			{ "Alloc",           VM::MEMALLOC },
+			{ "Addr",            VM::ADDR },
 			{ "Append",          VM::MEMAPPEND },
 			{ "Free",            VM::MEMDEALLOC },
 			{ "Size",            VM::MEMSIZE },
@@ -282,6 +283,8 @@ namespace TucanScript {
 			//Native wrapping
 			{ "LoadLibrary",     VM::LOADLIB },
 			{ "GetProcAddr",     VM::LOADSYM },
+
+			//Coroutines
 			{ "Yield",           VM::YIELD },
 			{ "WaitForEachTask", VM::WAITFOREACHTASK },
 			{ "ResumeTask",      VM::RESUMETASK },
@@ -348,7 +351,8 @@ namespace TucanScript {
 			{VM::COS,           "Cos"},
 			{VM::ATAN2,         "Atan2"},
 			{VM::SQRT,          "Sqrt"},
-			{VM::ABSF,          "Abs"}
+			{VM::ABSF,          "AbsF"},
+			{VM::ADDR,          "WordAddr"}
 		};
 
 	public:
