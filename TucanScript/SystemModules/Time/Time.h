@@ -25,9 +25,9 @@ Undef PushWord (VM::VirtualStack* stack, T value) {
 }
 
 ExternC {
-	TucanAPI Undef GetProcessTime (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef GetSysTime (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef GetClocksPerSec (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
+	TucanAPI Undef GetProcessTime (ExC_Args);
+	TucanAPI Undef GetSysTime (ExC_Args);
+	TucanAPI Undef GetClocksPerSec (ExC_Args);
 }
 
 #endif

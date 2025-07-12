@@ -4,7 +4,7 @@ using namespace TucanScript;
 
 ExternC {
 #pragma region [Unsafe]
-	TucanAPI Undef R_Alloc (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef R_Alloc (ExC_Args) {
 		stack->Push (VM::Val {
 			.m_Type = VM::NATIVEPTR_T,
 			.m_Data = VM::Word {
@@ -13,32 +13,32 @@ ExternC {
 		});
 	}
 
-	TucanAPI Undef R_PtrToQWord (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef R_PtrToQWord (ExC_Args) {
 		auto ptr = args->m_Memory[0];
 		ptr.m_Type = VM::UINT64_T;
 		stack->Push (ptr);
 	}
 
-	TucanAPI Undef R_QWordToPtr (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef R_QWordToPtr (ExC_Args) {
 		auto ptr = args->m_Memory[0];
 		ptr.m_Type = VM::NATIVEPTR_T;
 		stack->Push (ptr);
 	}
 
-	TucanAPI Undef R_StrCat (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef R_StrCat (ExC_Args) {
 		auto a = args->m_Memory[0];
 		auto b = args->m_Memory[1];
 		StrOp (*stack, a, b, &std::strcat);
 	}
 
-	TucanAPI Undef R_StrCpy (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef R_StrCpy (ExC_Args) {
 		auto a = args->m_Memory[0];
 		auto b = args->m_Memory[1];
 		StrOp (*stack, a, b, &std::strcpy);
 	}
 #pragma endregion
 
-	TucanAPI Undef Merge (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef Merge (ExC_Args) {
 		auto a = args->m_Memory[0];
 		auto b = args->m_Memory[1];
 
@@ -58,11 +58,11 @@ ExternC {
 		stack->Push<VM::Managed*, VM::MANAGED_T> (merged, &VM::Word::m_ManagedPtr);
 	}
 
-	TucanAPI Undef GetRawBuf (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef GetRawBuf (ExC_Args) {
 		stack->Push (args->m_Memory[0].m_Data.m_ManagedPtr->m_Memory.m_hRawBuf);
 	}
 
-	TucanAPI Undef SetCoroutineProps (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory* frame, const VM::ValMem* args) {
+	TucanAPI Undef SetCoroutineProps (ExC_Args) {
 		auto scheduler = vm->GetScheduler ();
 		scheduler->m_TaskMemoryProps.m_CallDepth = args->m_Memory[1].m_Data.m_U64;
 		scheduler->m_TaskMemoryProps.m_StackSize = args->m_Memory[0].m_Data.m_U64;

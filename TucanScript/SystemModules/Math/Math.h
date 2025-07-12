@@ -7,26 +7,26 @@
 using namespace TucanScript;
 
 ExternC {
-    TucanAPI Undef Sin (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Cos (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Tan (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Asin (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Acos (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Atan (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Atan2 (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Sinh (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Cosh (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Tanh (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Exp (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Log (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Sqrt (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Pow (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Ceil (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Floor (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Round (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Abs (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Fmod (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-    TucanAPI Undef Remainder (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
+    TucanAPI Undef Sin (ExC_Args);
+    TucanAPI Undef Cos (ExC_Args);
+    TucanAPI Undef Tan (ExC_Args);
+    TucanAPI Undef Asin (ExC_Args);
+    TucanAPI Undef Acos (ExC_Args);
+    TucanAPI Undef Atan (ExC_Args);
+    TucanAPI Undef Atan2 (ExC_Args);
+    TucanAPI Undef Sinh (ExC_Args);
+    TucanAPI Undef Cosh (ExC_Args);
+    TucanAPI Undef Tanh (ExC_Args);
+    TucanAPI Undef Exp (ExC_Args);
+    TucanAPI Undef Log (ExC_Args);
+    TucanAPI Undef Sqrt (ExC_Args);
+    TucanAPI Undef Pow (ExC_Args);
+    TucanAPI Undef Ceil (ExC_Args);
+    TucanAPI Undef Floor (ExC_Args);
+    TucanAPI Undef Round (ExC_Args);
+    TucanAPI Undef Abs (ExC_Args);
+    TucanAPI Undef Fmod (ExC_Args);
+    TucanAPI Undef Remainder (ExC_Args);
 }
 
 #endif

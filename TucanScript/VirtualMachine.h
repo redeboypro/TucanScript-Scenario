@@ -21,6 +21,11 @@ namespace TucanScript::VM {
 
 	using ExternCall_t = Undef (*)(VirtualMachine*, VirtualStack*, JmpMemory*, ValMem* const);
 
+	#define ExC_Args VM::VirtualMachine* vm, \
+					 VM::VirtualStack* stack,\
+					 VM::JmpMemory* frame,   \
+					 const VM::ValMem* args
+
 	enum OpCode : UInt8 {
 		HALT,
 

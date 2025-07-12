@@ -15,16 +15,16 @@ inline Undef StrOp (VM::VirtualStack& stack,
 
 ExternC {
 #pragma region [Raw]
-	TucanAPI Undef R_Alloc (VM::VirtualMachine * vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef R_PtrToQWord (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef R_QWordToPtr (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef R_StrCat (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef R_StrCpy (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
+	TucanAPI Undef R_Alloc (ExC_Args);
+	TucanAPI Undef R_PtrToQWord (ExC_Args);
+	TucanAPI Undef R_QWordToPtr (ExC_Args);
+	TucanAPI Undef R_StrCat (ExC_Args);
+	TucanAPI Undef R_StrCpy (ExC_Args);
 #pragma endregion
 
-	TucanAPI Undef Merge (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef GetRawBuf (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
-	TucanAPI Undef SetCoroutineProps (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
+	TucanAPI Undef Merge (ExC_Args);
+	TucanAPI Undef GetRawBuf (ExC_Args);
+	TucanAPI Undef SetCoroutineProps (ExC_Args);
 }
 
 #endif

@@ -1,15 +1,15 @@
 #include "Time.h"
 
 ExternC {
-	TucanAPI Undef GetProcessTime (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*) {
+	TucanAPI Undef GetProcessTime (ExC_Args) {
 		PushWord (stack, std::clock ());
 	}
 
-	TucanAPI Undef GetSysTime (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*,const VM::ValMem*) {
+	TucanAPI Undef GetSysTime (ExC_Args) {
 		PushWord (stack, std::time (nullptr));
 	}
 
-	TucanAPI Undef GetClocksPerSec (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*,const VM::ValMem*) {
+	TucanAPI Undef GetClocksPerSec (ExC_Args) {
 		PushWord (stack, CLOCKS_PER_SEC);
 	}
 }
