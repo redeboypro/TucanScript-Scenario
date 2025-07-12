@@ -7,7 +7,7 @@
 using namespace TucanScript;
 
 template <typename T>
-Undef PushWord (VM::VirtualMachine* vm, T value) {
+Undef PushWord (VM::VirtualStack* stack, T value) {
 	VM::Val val {};
 	std::memcpy (&val.m_Data, &value, sizeof (T));
 
@@ -21,13 +21,13 @@ Undef PushWord (VM::VirtualMachine* vm, T value) {
 		val.m_Type = VM::UINT64_T;
 	}
 
-	vm->GetStack ()->Push (val);
+	stack->Push (val);
 }
 
 ExternC {
-	TucanAPI Undef GetProcessTime (VM::VirtualMachine* vm, const VM::ValMem*);
-	TucanAPI Undef GetSysTime (VM::VirtualMachine* vm, const VM::ValMem*);
-	TucanAPI Undef GetClocksPerSec (VM::VirtualMachine* vm, const VM::ValMem*);
+	TucanAPI Undef GetProcessTime (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
+	TucanAPI Undef GetSysTime (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
+	TucanAPI Undef GetClocksPerSec (VM::VirtualMachine* vm, VM::VirtualStack* stack, VM::JmpMemory*, const VM::ValMem*);
 }
 
 #endif

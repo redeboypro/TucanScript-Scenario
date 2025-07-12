@@ -91,7 +91,7 @@ namespace TucanScript::Lexer {
 		ASYNC,
 		INCLUDE,
 
-		CSTR
+		CSTR,
 	};
 
 	struct Token final {
@@ -131,7 +131,7 @@ namespace TucanScript::Lexer {
 		{ "continue", TokenType::CONTINUE },
 		{ "include",  TokenType::INCLUDE },
 		{ "async",    TokenType::ASYNC },
-		{ "cstr",     TokenType::CSTR }
+		{ "cstr",     TokenType::CSTR },
 	};
 
 	class Tokenizer final {

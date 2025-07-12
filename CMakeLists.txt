@@ -14,6 +14,11 @@ add_library (Time SHARED
 			TucanScript/Utility.h
 			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
 
+add_library (Memory SHARED
+			TucanScript/SystemModules/Memory/Memory.h TucanScript/SystemModules/Memory/Memory.cpp
+			TucanScript/Utility.h
+			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+
 add_executable (tbinc
 			 TucanScript/BuildUtility/main.cpp
 			 TucanScript/Utility.h

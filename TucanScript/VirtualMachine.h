@@ -13,11 +13,13 @@ namespace TucanScript::VM {
 	union  Word;
 	struct Val;
 	struct Managed;
+	struct JmpMemory;
+	class  VirtualStack;
 	class  VirtualMachine;
 
 	typedef MemoryView<Val> ValMem;
 
-	using ExCall_t = Undef (*)(VirtualMachine*, ValMem* const);
+	using ExternCall_t = Undef (*)(VirtualMachine*, VirtualStack*, JmpMemory*, ValMem* const);
 
 	enum OpCode : UInt8 {
 		HALT,
@@ -38,7 +40,6 @@ namespace TucanScript::VM {
 		SEQUENCEALLOC,
 		MEMAPPEND,
 		MEMALLOC,
-		CMEMALLOC,
 		MEMDEALLOC,
 		MEMCPY,
 
@@ -58,6 +59,12 @@ namespace TucanScript::VM {
 		MUL,
 		DIV,
 
+		SIN,
+		COS,
+		ATAN2,
+		SQRT,
+		ABSF,
+
 		CMPE,
 		CMPNE,
 		CMPG,
@@ -71,27 +78,19 @@ namespace TucanScript::VM {
 		PRINT,
 		SCAN,
 
-		PTR2DWORD,
-		PTR2QWORD,
-		DWORD2PTR,
-		QWORD2PTR,
-
-		WRAP,
-
-		CONCAT,
-		STRCAT,
-		STRCPY,
+		ADDR,
+		PIN,
 
 		LOADLIB,
 		LOADSYM,
-		DOEXCALL,
+		CALLADDR,
 		GETMOD,
 
-		GETRAWMEM,
-		PIN,
+		YIELD,
 
-		SETTASKPROPS,
-		YIELD //Experimental
+		WAITFOREACHTASK,
+		RESUMETASK,
+		CLOSETASK,
 	};
 
 	enum ValType : UInt8 {
@@ -273,12 +272,12 @@ namespace TucanScript::VM {
 		Undef Free ();
 	};
 
-	class VMStack final {
+	class VirtualStack final {
 		Val* m_Data;
 		SInt32 m_End;
 	public:
-		VMStack (Size size);
-		~VMStack ();
+		VirtualStack (Size size);
+		~VirtualStack ();
 
 		const Size m_Size;
 
@@ -288,10 +287,10 @@ namespace TucanScript::VM {
 				.m_Type = TYPE
 			};
 			result.m_Data.*field = value;
-			Push (result);
+			Push(result);
 		}
 
-		Undef Push (Val value);
+		Undef Push(const Val& value);
 		Undef Push (Boolean value);
 		Undef Push (SInt8 value);
 		Undef Push (UInt8 value);
@@ -306,7 +305,7 @@ namespace TucanScript::VM {
 		Val Pop ();
 	};
 
-	class VMAllocator final {
+	class VirtualAllocator final {
 		Managed* m_hBegin;
 		Managed* m_hEnd;
 		UInt64   m_nBlocks { Zero };
@@ -328,7 +327,7 @@ namespace TucanScript::VM {
 		}
 
 	public:
-		VMAllocator ();
+		VirtualAllocator ();
 
 		const Managed& Begin ();
 		const Managed& End ();
@@ -353,15 +352,15 @@ namespace TucanScript::VM {
 	};
 
 	struct Task final {
-		SInt64    m_qInstr;
-		Boolean   m_Running;
-		VMStack*  m_hStack;
-		JmpMemory m_Frame;
+		SInt64        m_qInstr;
+		Boolean       m_Running;
+		VirtualStack* m_hStack;
+		JmpMemory     m_Frame;
 	};
 
 	using HTask = Task*;
 
-	class TaskPool final {
+	class TaskScheduler final {
 		HTask*  m_Tasks { nullptr };
 		Size    m_Capacity { Zero };
 
@@ -373,9 +372,9 @@ namespace TucanScript::VM {
 		Undef Resize (Size newCapacity);
 
 	public:
-		TaskPool () = default;
+		TaskScheduler () = default;
 
-		~TaskPool () {
+		~TaskScheduler () {
 			Free ();
 		}
 
@@ -403,18 +402,18 @@ namespace TucanScript::VM {
 	};
 
 	class VirtualMachine final {
-		VMStack            m_Stack;
-		VMAllocator        m_Allocator;
-		Asm                m_Asm;
-		UnsafeDeallocator* m_hGlobalDeallocator;
-		ValMem             m_FixedMemory;
-		JmpMemory          m_JmpMemory;
-		TaskPool           m_TaskPool;
-		Boolean            m_Free {};
-		SInt64             m_IPtr;
+		VirtualStack            m_Stack;
+		VirtualAllocator        m_Allocator;
+		Asm						m_Asm;
+		UnsafeDeallocator*		m_hGlobalDeallocator;
+		ValMem					m_FixedMemory;
+		JmpMemory				m_JmpMemory;
+		TaskScheduler           m_TaskPool;
+		Boolean					m_Free {};
+		SInt64					m_IPtr;
 
 		VM::Val Unpack (JmpMemory& frame, const Val& value) const;
-		VM::Val PopUnpack (VMStack& stack, JmpMemory& frame);
+		VM::Val PopUnpack (VirtualStack& stack, JmpMemory& frame);
 		Undef Jmp (SInt64 & iInst, Instruction& instruction);
 
 		inline Call& GetLastCall (JmpMemory& jmpMemory) const {
@@ -486,7 +485,7 @@ namespace TucanScript::VM {
 		inline Undef Cast (Val& data, ValType type, TYPE Word::* sourceField) {
 			if (TryCast<TYPE> (data, sourceField)) {
 				data.m_Type = type;
-				m_Stack.Push (data);
+				m_Stack.Push(data);
 				return;
 			}
 			LogInstErr ("CAST", "Unable to cast!");
@@ -566,23 +565,60 @@ namespace TucanScript::VM {
 			}
 		}
 
-		Undef MemCopy(VMStack& stack, MemCpyFrameArgs frameArgs, const Val& dest, const Val& src, Boolean pushBack = true);
+		Undef MemCopy(VirtualStack& stack, MemCpyFrameArgs frameArgs, Val & dest, const Val& src, Boolean pushBack = true);
 
 		inline Boolean IsTrue (const Val& value) const {
-			return (value.m_Type Is BYTE_T  && value.m_Data.m_UC) ||
-				   (value.m_Type Is CHAR_T  && value.m_Data.m_C)  ||
-				   (value.m_Type Is INT32_T && value.m_Data.m_I32);
+			return (value.m_Type Is BYTE_T  && value.m_Data.m_UC)   ||
+				   (value.m_Type Is CHAR_T  && value.m_Data.m_C)    ||
+				   (value.m_Type Is INT32_T && value.m_Data.m_I32)  ||
+				   (value.m_Type Is UINT32_T && value.m_Data.m_I32) ||
+				   (value.m_Type Is NATIVEPTR_T && value.m_Data.m_NativePtr);
 		}
 
-		Undef StrOp (VMStack& stack, const Val& a, const Val& b, Sym* (*op)(Sym*, const Sym*));
 		Sym* GetCStr (const Managed* managedMemory);
-		Undef AllocStr(VMStack& stack, Sym* buffer, Size size);
+		Undef AllocStr (VirtualStack& stack, Sym* buffer, Size size);
 
-		TucanScript::SInt32 HandleInstr (SInt64& qInstr, VMStack& stack, JmpMemory& frame);
+		TucanScript::SInt32 HandleInstr (SInt64& qInstr, VirtualStack& stack, JmpMemory& frame);
 
-		Undef DoRecordJump(SInt64& qContextInstr, Instruction& jmpInstr,
-			VMStack& stack,
+		Undef DoRecordJump (SInt64& qContextInstr, Instruction& jmpInstr,
+			VirtualStack& stack,
 			const MemCpyFrameArgs& frameArgs);
+
+		Val GetRawElement (Managed* managedMemory, UInt64 index) {
+			auto rawMemory =
+			#if CHAR_MIN < 0
+				(SInt8*) managedMemory;
+			#else
+				(UInt8*) managedMemory;
+			#endif
+			return Val {
+				.m_Type = NATIVEPTR_T,
+				.m_Data = Word { 
+					.m_NativePtr = &(rawMemory)[index]
+				}
+			};
+		}
+
+		inline Undef LinearAlgProc (
+			VirtualStack& stack,
+			JmpMemory& frame,
+			Dec32 (*f32)(Dec32), Dec64 (*f64)(Dec64)) {
+			auto angle = PopUnpack (stack, frame);
+			if (angle.m_Type Is ValType::FLOAT32_T) {
+				stack.Push (f32 (angle.m_Data.m_F32));
+			}
+			else if (angle.m_Type Is ValType::FLOAT64_T) {
+				stack.Push (f64 (angle.m_Data.m_F64));
+			}
+		}
+
+		Undef ResumeTask (HTask hTask);
+		inline Undef CloseTask (HTask hTask) {
+			hTask->m_Running = false;
+			delete hTask->m_hStack;
+			hTask->m_hStack = nullptr;
+			hTask->m_Frame.Free ();
+		}
 
 	public:
 		VirtualMachine (
@@ -596,8 +632,6 @@ namespace TucanScript::VM {
 
 		Undef Run ();
 		Undef Free ();
-
-		Undef NextCoroutineStep ();
 
 		inline Undef ForceCall (SInt64 destInstrPtr) {
 			Instruction jmpInstr {
@@ -647,7 +681,9 @@ namespace TucanScript::VM {
 			m_FixedMemory.m_Memory[qChunkPtr] = chunkVal;
 		}
 
-		VMStack* GetStack () { return &m_Stack; };
+		VirtualStack* GetStack () { return &m_Stack; };
+		VirtualAllocator* GetAllocator () { return &m_Allocator; };
+		TaskScheduler* GetScheduler () { return &m_TaskPool; };
 	};
 }
 #endif

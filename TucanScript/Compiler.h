@@ -268,36 +268,31 @@ namespace TucanScript {
 			{ "QWORD",           VM::TOU64 },
 			{ "float",           VM::TOF32 },
 			{ "double",          VM::TOF64 },
-
-			{ "PtrAsDWORD",      VM::PTR2DWORD },
-			{ "PtrAsQWORD",      VM::PTR2QWORD },
-			{ "DWORDAsPtr",      VM::DWORD2PTR },
-			{ "QWORDAsPtr",      VM::QWORD2PTR },
-
 			{ "Log",             VM::PRINT },
 			{ "Scan",            VM::SCAN },
-			{ "PopStack",        VM::POP },
-			{ "SetTaskProps",    VM::SETTASKPROPS },
-			{ "Alloc",           VM::MEMALLOC },
 			{ "Pin",             { VM::PIN, true } },
-			{ "GetRawPtr",       VM::GETRAWMEM },
+			{ "Pop",             VM::POP },
+			{ "Alloc",           VM::MEMALLOC },
 			{ "Append",          VM::MEMAPPEND },
 			{ "Free",            VM::MEMDEALLOC },
 			{ "Size",            VM::MEMSIZE },
 			{ "Return",          { VM::RETURN, true } },
-			{ "IntPtr",          VM::WRAP },
-			{ "Join",            VM::CONCAT },
 			{ "Exit",            VM::HALT },
-
-			//C Functions
-			{ "malloc",          VM::CMEMALLOC },
-			{ "strcat",          VM::STRCAT },
-			{ "strcpy",          VM::STRCPY },
 
 			//Native wrapping
 			{ "LoadLibrary",     VM::LOADLIB },
 			{ "GetProcAddr",     VM::LOADSYM },
 			{ "Yield",           VM::YIELD },
+			{ "WaitForEachTask", VM::WAITFOREACHTASK },
+			{ "ResumeTask",      VM::RESUMETASK },
+			{ "CloseTask",       VM::CLOSETASK },
+
+			//Linear alg
+			{ "Sin",             VM::SIN },
+			{ "Cos",             VM::COS },
+			{ "Atan2",           VM::ATAN2 },
+			{ "Sqrt",            VM::SQRT },
+			{ "AbsF",            VM::ABSF }
 		};
 
 		const Dictionary<VM::OpCode, String> OpDebugMap {
@@ -316,7 +311,6 @@ namespace TucanScript {
 			{VM::STRALLOC,      "MemoryAlloc (String)"},
 			{VM::CSTRALLOC,     "NativeMemoryAlloc (String)"},
 			{VM::SEQUENCEALLOC, "MemoryAlloc (Sequence)"},
-			{VM::CMEMALLOC,     "NativeMemoryAlloc"},
 			{VM::MEMALLOC,      "MemoryAlloc"},
 			{VM::MEMDEALLOC,    "MemoryDealloc"},
 			{VM::MEMCPY,        "MemoryCopy"},
@@ -344,22 +338,17 @@ namespace TucanScript {
 			{VM::OR,            "Or"},
 			{VM::PRINT,         "SysOut"},
 			{VM::SCAN,          "SysIn"},
-			{VM::PTR2DWORD,     "PtrToDWORD"},
-			{VM::PTR2QWORD,     "PtrToQWORD"},
-			{VM::DWORD2PTR,     "DWORDToPtr"},
-			{VM::QWORD2PTR,     "QWORDToPtr"},
-			{VM::WRAP,          "Pack"},
-			{VM::CONCAT,        "Concat"},
-			{VM::STRCAT,        "NativeConcat"},
-			{VM::STRCPY,        "NativeStringCopy"},
 			{VM::HALT,          "Halt"},
 			{VM::LOADLIB,       "LoadLibrary"},
 			{VM::LOADSYM,       "LoadSym"},
-			{VM::DOEXCALL,      "ExternalCall"},
-			{VM::PIN,           "PinMemoryChunk"},
-			{VM::GETRAWMEM,     "GetRawMemoryPtr"},
-			{VM::SETTASKPROPS,  "SetTaskAllocProps"},
-			{VM::YIELD,         "Yield"}
+			{VM::YIELD,         "Yield"},
+			{VM::PIN,           "Pin"},
+			{VM::CALLADDR,      "CallAddr"},
+			{VM::SIN,           "Sin"},
+			{VM::COS,           "Cos"},
+			{VM::ATAN2,         "Atan2"},
+			{VM::SQRT,          "Sqrt"},
+			{VM::ABSF,          "Abs"}
 		};
 
 	public:

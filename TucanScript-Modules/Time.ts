@@ -5,19 +5,19 @@ GetClocksPerSec = GetProcAddr(hTimeLib, "GetClocksPerSec");
 
 CLOCKS_PER_SEC = GetClocksPerSec();
 
-def IntDelay(seconds) : start;
-def DecDelay(seconds) : start;
+def WaitForSeconds(seconds) : start;
+def WaitForSecondsF(seconds) : start;
 
-imp IntDelay(seconds) {
+imp WaitForSeconds(seconds) {
    start = GetSysTime();
    while (GetSysTime() - start < seconds) {
-      #Just wait
+      Yield();
    }
 }
 
-imp DecDelay(seconds) {
+imp WaitForSecondsF(seconds) {
    start = GetProcessTime();
    while (double(GetProcessTime() - start) / double(CLOCKS_PER_SEC) < seconds) {
-      #Just wait
+      Yield();
    }
 }

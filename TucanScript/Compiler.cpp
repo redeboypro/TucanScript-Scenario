@@ -423,14 +423,15 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						}
 
 						SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
-						Log (nArgs);
+
 						if (IsValidID (nArgs)) {
 							Push (funInfo.m_NumArgs);
 							Push (static_cast<SInt32>(funInfo.m_DefinedVars.size ()));
 							Call (funInfo, async);
 						}
 						else {
-							LogErr ("Invalid call signature for " << *strValuePtr);
+							funInfo.m_Calls.push_back (m_Instructions.size ());
+							Push (0x0LL);
 						}
 						continue;
 					}
@@ -444,13 +445,28 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 
 					SInt32 rAddressTest2 = Found (m_DefinedVars, *strValuePtr);
 					if (IsValidID (rAddressTest2)) {
-						SInt32 numArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
-						Push (rAddressTest2, VM::RADDRESS_T);
-						if (numArgs != InvalidSignature) {
+						SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
+
+						if (nArgs != InvalidSignature) {
+							Push (nArgs);
+							if (iToken < PrevWord (numTokens) &&
+								expressionTokens[NextWord (iToken)].m_Type Is Lexer::TokenType::DBLDOT) {
+								iToken += 2;
+								if (const String* strValuePtr = std::get_if<String> (&expressionTokens[iToken].m_Val)) {
+									auto funIt = m_DefinedFuncs.find (*strValuePtr);
+									if (funIt != m_DefinedFuncs.end ()) {
+										auto& funInfo = funIt->second;
+										Push (funInfo.m_DefinedVars.size ());
+									}
+								}
+							}
+							Push (rAddressTest2, VM::RADDRESS_T);
 							m_Instructions.push_back (VM::Instruction {
-								.m_Op  = VM::DOEXCALL,
-								.m_Val = VM::ValUtility::_DWORD_signed_raw(&numArgs, false)
+								.m_Op  = VM::CALLADDR
 							});
+						}
+						else {
+							Push (rAddressTest2, VM::RADDRESS_T);
 						}
 						continue;
 					}
@@ -502,7 +518,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						}
 
 						if (rawTokenStack.empty ()) {
-							std::cerr << "Mismatched parentheses!" << std::endl;
+							LogErr ("Mismatched parentheses!");
 						}
 
 						rawTokenStack.pop ();
@@ -516,7 +532,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 		auto  topId = rawTokenStack.top ();
 		auto& topToken = expressionTokens[topId];
 		if (IsLParen (topToken.m_Type) || IsRParen (topToken.m_Type)) {
-			std::cerr << "Mismatched parentheses!" << std::endl;
+			LogErr ("Mismatched parentheses!");
 		}
 		Op (topToken.m_Type);
 		rawTokenStack.pop ();
@@ -525,7 +541,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 	if (!m_Instructions.empty ()) {
 		auto& lastOp = m_Instructions[PrevWord (m_Instructions.size ())];
 		if (!innerExpr) {
-			if ((lastOp.m_Op Is VM::MEMCPY || lastOp.m_Op Is VM::MEMSTORE || lastOp.m_Op Is VM::PIN)) {
+			if ((lastOp.m_Op Is VM::MEMCPY || lastOp.m_Op Is VM::MEMSTORE)) {
 				Op (VM::POP);
 			}
 		}
