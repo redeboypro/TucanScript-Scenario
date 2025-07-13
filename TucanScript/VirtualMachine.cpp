@@ -894,18 +894,6 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			stack.Push <Undef*, NATIVEPTR_T> (&memory->m_Data, &Word::m_NativePtr);
 			break;
 		}
-		case WAITFOREACHTASK: {
-			WaitForYield ();
-			break;
-		}
-		case RESUMETASK: {
-			ResumeTask ((HTask) PopUnpack (stack, frame).m_Data.m_NativePtr);
-			break;
-		}
-		case CLOSETASK: {
-			CloseTask ((HTask) PopUnpack (stack, frame).m_Data.m_NativePtr);
-			break;
-		}
 	}
 
 	return _Success;

@@ -61,10 +61,4 @@ ExternC {
 	TucanAPI Undef GetRawBuf (ExC_Args) {
 		stack->Push (args->m_Memory[0].m_Data.m_ManagedPtr->m_Memory.m_hRawBuf);
 	}
-
-	TucanAPI Undef SetCoroutineProps (ExC_Args) {
-		auto scheduler = vm->GetScheduler ();
-		scheduler->m_TaskMemoryProps.m_CallDepth = args->m_Memory[1].m_Data.m_U64;
-		scheduler->m_TaskMemoryProps.m_StackSize = args->m_Memory[0].m_Data.m_U64;
-	}
 }

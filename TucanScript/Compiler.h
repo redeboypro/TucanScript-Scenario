@@ -286,9 +286,6 @@ namespace TucanScript {
 
 			//Coroutines
 			{ "Yield",           VM::YIELD },
-			{ "WaitForEachTask", VM::WAITFOREACHTASK },
-			{ "ResumeTask",      VM::RESUMETASK },
-			{ "CloseTask",       VM::CLOSETASK },
 
 			//Linear alg
 			{ "Sin",             VM::SIN },

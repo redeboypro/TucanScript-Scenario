@@ -24,7 +24,6 @@ ExternC {
 
 	TucanAPI Undef Merge (ExC_Args);
 	TucanAPI Undef GetRawBuf (ExC_Args);
-	TucanAPI Undef SetCoroutineProps (ExC_Args);
 }
 
 #endif

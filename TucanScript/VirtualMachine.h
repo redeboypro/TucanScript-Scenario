@@ -91,11 +91,7 @@ namespace TucanScript::VM {
 		CALLADDR,
 		GETMOD,
 
-		YIELD,
-
-		WAITFOREACHTASK,
-		RESUMETASK,
-		CLOSETASK,
+		YIELD
 	};
 
 	enum ValType : UInt8 {
@@ -617,14 +613,6 @@ namespace TucanScript::VM {
 			}
 		}
 
-		Undef ResumeTask (HTask hTask);
-		inline Undef CloseTask (HTask hTask) {
-			hTask->m_Running = false;
-			delete hTask->m_hStack;
-			hTask->m_hStack = nullptr;
-			hTask->m_Frame.Free ();
-		}
-
 	public:
 		VirtualMachine (
 			UInt64 stackSize,
@@ -653,6 +641,13 @@ namespace TucanScript::VM {
 		}
 
 		Undef WaitForYield ();
+		Undef ResumeTask (HTask hTask);
+		inline Undef CloseTask (HTask hTask) {
+			hTask->m_Running = false;
+			delete hTask->m_hStack;
+			hTask->m_hStack = nullptr;
+			hTask->m_Frame.Free ();
+		}
 
 		inline Boolean Next () {
 			if (HandleInstr (m_IPtr, m_Stack, m_JmpMemory) == _Exit) {

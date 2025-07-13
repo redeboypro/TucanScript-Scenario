@@ -19,6 +19,11 @@ add_library (Memory SHARED
 			TucanScript/Utility.h
 			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
 
+add_library (Coroutines SHARED
+			TucanScript/SystemModules/Coroutines/Coroutines.h TucanScript/SystemModules/Coroutines/Coroutines.cpp
+			TucanScript/Utility.h
+			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+
 add_executable (tbinc
 			 TucanScript/BuildUtility/main.cpp
 			 TucanScript/Utility.h
