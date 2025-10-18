@@ -774,7 +774,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 		}
 		case LOADLIB: {
 			auto* hName = PopUnpack (stack, frame).m_Data.m_ManagedPtr;
-			auto* cStrName = GetCStr (hName);
+			auto* cStrName = (Sym*) hName->m_Memory.m_hRawBuf;
 
 			Undef* hLib = GetModule (cStrName);
 			if (!hLib) {
@@ -782,7 +782,6 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 
 				if (!hLib) {
 					LogInstErr (nameof (LOADLIB), "Failed to load library: " << cStrName);
-					std::free (cStrName);
 					Free ();
 					return _Fail;
 				}
@@ -794,7 +793,6 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 					}
 				);
 			}
-			std::free (cStrName);
 			m_Allocator.HandleReferences (hName);
 
 			stack.Push <Undef*, NATIVEPTR_T> (hLib, &Word::m_NativePtr);
@@ -804,9 +802,8 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			auto* hName = PopUnpack (stack, frame).m_Data.m_ManagedPtr;
 			auto* hLib = PopUnpack (stack, frame).m_Data.m_NativePtr;
 
-			auto* cStrName = GetCStr (hName);
+			auto* cStrName = (Sym*) hName->m_Memory.m_hRawBuf;
 			auto* hSym = ProcAddr (hLib, cStrName);
-			std::free (cStrName);
 
 			if (!hSym) {
 				LogInstErr (nameof (LOADSYM), "Failed to load symbol: " << cStrName);
@@ -877,9 +874,9 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			stack.Push (Val {
 				.m_Type = MANAGED_T,
 				.m_Data = Word {
-							.m_ManagedPtr = m_Allocator.Alloc (memory, memorySize)
-						}
-						});
+					.m_ManagedPtr = m_Allocator.Alloc (memory, memorySize)
+				}
+			});
 			break;
 		}
 		case ADDR: {
@@ -932,6 +929,9 @@ Undef TucanScript::VM::VirtualMachine::ResumeTask (HTask hTask) {
 		if (HandleInstr (hTask->m_qInstr, *hTask->m_hStack, hTask->m_Frame) == _Exit) {
 			CloseTask (hTask);
 			return;
+		}
+		else {
+			++hTask->m_qInstr;
 		}
 	} while (hInstr->m_Op != YIELD);
 }

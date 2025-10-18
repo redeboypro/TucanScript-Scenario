@@ -37,11 +37,11 @@ Undef TucanScript::Lexer::Tokenizer::ProcNumericSuffix (Sym source, TokenType& t
 
 Lexer::Token TucanScript::Lexer::Tokenizer::CreateToken (const TokenVal& value, const TokenType type) {
 	Token entryToken {
-			.m_Val  = value,
-			.m_Type = type
+		.m_Val  = value,
+		.m_Type = type
 	};
 	
-	if (type Is TokenType::STR) {
+	if (type Is TokenType::STR || type Is TokenType::CSTR) {
 		return entryToken;
 	}
 
@@ -219,7 +219,18 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 				}
 				strValueUnit = source[++iChar];
 			}
-			rawTokens.push_back (std::move (CreateToken (tokenStr, TokenType::STR)));
+
+			TokenType strTokenType = TokenType::STR;
+
+			constexpr static auto R_PREFIX = 'r';
+
+			UInt64 iPostfixChar = NextWord (iChar);
+			if (iPostfixChar < source.size () && source[iPostfixChar] == R_PREFIX) {
+				strTokenType = TokenType::CSTR;
+				++iChar;
+			}
+
+			rawTokens.push_back (std::move (CreateToken (tokenStr, strTokenType)));
 			tokenStr.clear ();
 			continue;
 		}

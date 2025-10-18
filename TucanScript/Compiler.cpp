@@ -347,17 +347,16 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 			case Lexer::TokenType::STR: {
 				const String* strValuePtr = std::get_if<String> (&token.m_Val);
 				if (strValuePtr) {
-					SInt32 iNext = NextWord (iToken);
-					if (iNext < numTokens) {
-						if (expressionTokens[iNext].m_Type Is Lexer::TokenType::CSTR) {
-							StringAlloc (*strValuePtr, true);
-							iNext++;
-						}
-						else StringAlloc (*strValuePtr, false);
-					}
-					else {
-						StringAlloc (*strValuePtr, false);
-					}
+					StringAlloc (*strValuePtr);
+					Push (0x1);
+					Op (VM::PIN);
+				}
+				break;
+			}
+			case Lexer::TokenType::CSTR: {
+				const String* strValuePtr = std::get_if<String> (&token.m_Val);
+				if (strValuePtr) {
+					StringAlloc (*strValuePtr);
 				}
 				break;
 			}

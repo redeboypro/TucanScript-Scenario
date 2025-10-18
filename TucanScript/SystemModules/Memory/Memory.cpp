@@ -36,6 +36,19 @@ ExternC {
 		auto b = args->m_Memory[1];
 		StrOp (*stack, a, b, &std::strcpy);
 	}
+
+	TucanAPI Undef R_WriteWord (ExC_Args) {
+		auto pBuffer = ExC_NativePtrArg (0);
+		auto value = args->m_Memory[1];
+		const Size szWord = VM::ValUtility::SizeMap.at(value.m_Type);
+		std::memcpy (pBuffer, &value.m_Data, szWord);
+	}
+
+	TucanAPI Undef R_BufOffset (ExC_Args) {
+		Undef* pBuffer = ExC_NativePtrArg (0);
+		QWord szIncrement = ExC_QWordArg (1);
+		stack->Push<Undef*, VM::NATIVEPTR_T> (pBuffer + szIncrement, &VM::Word::m_NativePtr);
+	}
 #pragma endregion
 
 	TucanAPI Undef Merge (ExC_Args) {

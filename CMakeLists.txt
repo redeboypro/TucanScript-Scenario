@@ -4,6 +4,39 @@ project ("TucanScript")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+#add_library (Graphics SHARED
+#			#Vulkan
+#			TucanScript/SystemModules/Graphics/Vulkan.h
+#			TucanScript/SystemModules/Graphics/Vulkan.cpp
+#
+#			TucanScript/Utility.h
+#			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+
+#Graphics dependencies
+
+#Vulkan Test
+add_executable(VkTest 
+	TucanScript/VkTest/main.cpp
+	TucanScript/SystemModules/Graphics/Vulkan.h
+	TucanScript/SystemModules/Graphics/Vulkan.cpp
+	TucanScript/ThirdParty/lodepng.h
+	TucanScript/ThirdParty/lodepng.cpp)
+#target_link_libraries(VkTest PRIVATE  Graphics)
+#End Vulkan Test
+
+target_include_directories(VkTest PUBLIC
+    $ENV{H_GLFW}
+#   ${CMAKE_CURRENT_SOURCE_DIR}/TucanScript/SystemModules
+)
+find_package(Vulkan REQUIRED)
+
+target_link_libraries(VkTest PUBLIC 
+	$ENV{LIB_GLFW} 
+	Vulkan::Vulkan
+)
+
+#End Graphics dependencies
+
 add_library (Math SHARED
 			TucanScript/SystemModules/Math/Math.h TucanScript/SystemModules/Math/Math.cpp
 			TucanScript/Utility.h

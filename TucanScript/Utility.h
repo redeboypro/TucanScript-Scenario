@@ -14,6 +14,7 @@
 #include <ostream>
 #include <sstream>
 #include <string>
+#include <array>
 #include <vector>
 #include <variant>
 #include <unordered_map>
@@ -21,6 +22,7 @@
 #include <stack>
 #include <deque>
 #include <fstream>
+#include <set>
 #include <unordered_set>
 #include <mutex>
 
@@ -132,14 +134,20 @@ namespace TucanScript {
 	template <typename KEY, typename VALUE>
 	using Dictionary = std::unordered_map<KEY, VALUE>;
 
-	template <typename KTY, typename HASHER>
-	using UnorderedSet = std::unordered_set<KTY, HASHER>;
+	template <typename HASHER>
+	using Set = std::set<HASHER>;
+
+	template <typename KEY, typename HASHER>
+	using UnorderedSet = std::unordered_set<KEY, HASHER>;
 
 	template <typename ...T>
 	using Variant = std::variant<T...>;
 
 	template <typename T>
 	using Vector = std::vector<T>;
+
+	template <typename T, Size SIZE>
+	using Array = std::array<T, SIZE>;
 
 	template <typename T>
 	using InitializerList = std::initializer_list<T>;

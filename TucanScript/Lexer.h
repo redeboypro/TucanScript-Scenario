@@ -131,7 +131,6 @@ namespace TucanScript::Lexer {
 		{ "continue", TokenType::CONTINUE },
 		{ "include",  TokenType::INCLUDE },
 		{ "async",    TokenType::ASYNC },
-		{ "cstr",     TokenType::CSTR },
 	};
 
 	class Tokenizer final {

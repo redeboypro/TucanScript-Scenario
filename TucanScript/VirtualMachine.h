@@ -21,10 +21,24 @@ namespace TucanScript::VM {
 
 	using ExternCall_t = Undef (*)(VirtualMachine*, VirtualStack*, JmpMemory*, ValMem* const);
 
-	#define ExC_Args VM::VirtualMachine* vm, \
-					 VM::VirtualStack* stack,\
-					 VM::JmpMemory* frame,   \
-					 const VM::ValMem* args
+#define ExC_ByteArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_UC
+#define ExC_SByteArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_C
+#define ExC_WordArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_U16
+#define ExC_DWordArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_U32
+#define ExC_QWordArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_U64
+#define ExC_Int16Arg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_I16
+#define ExC_Int32Arg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_I32
+#define ExC_Int64Arg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_I64
+#define ExC_FloatArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_F32
+#define ExC_DoubleArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_F64
+#define ExC_ManagedArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr
+#define ExC_StringArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr.m_Memory.m_hRawBuf
+#define ExC_NativePtrArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_NativePtr
+
+#define ExC_Args VM::VirtualMachine* vm, \
+				 VM::VirtualStack* stack,\
+				 VM::JmpMemory* frame,   \
+				 const VM::ValMem* args
 
 	enum OpCode : UInt8 {
 		HALT,
@@ -138,7 +152,7 @@ namespace TucanScript::VM {
 
 	namespace ValUtility {
 		inline static Val _DWORD_signed_raw (Undef* value, Boolean fromUnsigned) {
-			UInt32 raw;
+			UInt32 raw {};
 			std::memcpy (&raw, value, sizeof (raw));
 			SInt32 signedWord = fromUnsigned ? static_cast<SInt32>(raw) : std::bit_cast<SInt32>(raw);
 
@@ -152,7 +166,7 @@ namespace TucanScript::VM {
 		}
 
 		inline static Val _QWORD_signed_raw (Undef* value, Boolean fromUnsigned) {
-			UInt64 raw;
+			UInt64 raw {};
 			std::memcpy (&raw, value, sizeof (raw));
 			SInt64 signedWord = fromUnsigned ? static_cast<SInt64>(raw) : std::bit_cast<SInt64>(raw);
 

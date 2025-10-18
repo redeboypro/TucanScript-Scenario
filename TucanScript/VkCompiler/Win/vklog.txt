@@ -1,0 +1,279 @@
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x40000000004
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pSignalSemaphores-00067 ] | MessageID = 0x539277af
+vkQueueSubmit(): pSubmits[0].pSignalSemaphores[0] (VkSemaphore 0x140000000014) is being signaled by VkQueue 0x233e03394c0, but it may still be in use by VkSwapchainKHR 0x20000000002.
+Here are the most recently acquired image indices: [0], 1, 2.
+(brackets mark the last use of VkSemaphore 0x140000000014 in a presentation operation)
+Swapchain image 0 was presented but was not re-acquired, so VkSemaphore 0x140000000014 may still be in use and cannot be safely reused with image index 2.
+Vulkan insight: One solution is to assign each image its own semaphore. Here are some common methods to ensure that a semaphore passed to vkQueuePresentKHR is not in use and can be safely reused:
+        a) Use a separate semaphore per swapchain image. Index these semaphores using the index of the acquired image.
+        b) Consider the VK_EXT_swapchain_maintenance1 extension. It allows using a VkFence with the presentation operation.
+The Vulkan spec states: Each binary semaphore element of the pSignalSemaphores member of any element of pSubmits must be unsignaled when the semaphore signal operation it defines is executed on the device (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pSignalSemaphores-00067)
+Objects: 2
+    [0] VkSemaphore 0x140000000014
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ VUID-vkQueueSubmit-pSignalSemaphores-00067 ] | MessageID = 0x539277af
+vkQueueSubmit(): pSubmits[0].pSignalSemaphores[0] (VkSemaphore 0x170000000017) is being signaled by VkQueue 0x233e03394c0, but it may still be in use by VkSwapchainKHR 0x20000000002.
+Here are the most recently acquired image indices: 0, [1], 2, 0.
+(brackets mark the last use of VkSemaphore 0x170000000017 in a presentation operation)
+Swapchain image 1 was presented but was not re-acquired, so VkSemaphore 0x170000000017 may still be in use and cannot be safely reused with image index 0.
+Vulkan insight: One solution is to assign each image its own semaphore. Here are some common methods to ensure that a semaphore passed to vkQueuePresentKHR is not in use and can be safely reused:
+        a) Use a separate semaphore per swapchain image. Index these semaphores using the index of the acquired image.
+        b) Consider the VK_EXT_swapchain_maintenance1 extension. It allows using a VkFence with the presentation operation.
+The Vulkan spec states: Each binary semaphore element of the pSignalSemaphores member of any element of pSubmits must be unsignaled when the semaphore signal operation it defines is executed on the device (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pSignalSemaphores-00067)
+Objects: 2
+    [0] VkSemaphore 0x170000000017
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x30000000003
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x50000000005
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x40000000004
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x30000000003
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x50000000005
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x40000000004
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x30000000003
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x50000000005
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01779 ] | MessageID = 0x5717e75b
+(Warning - This VUID has now been reported 10 times, which is the duplicated_message_limit value, this will be the last time reporting it).
+vkAcquireNextImageKHR(): Semaphore must not have any pending operations.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must not have any uncompleted signal or wait operations pending (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01779)
+Objects: 1
+    [0] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkQueueSubmit-pWaitSemaphores-03238 ] | MessageID = 0xb50452b0
+(Warning - This VUID has now been reported 10 times, which is the duplicated_message_limit value, this will be the last time reporting it).
+vkQueueSubmit(): pSubmits[0].pWaitSemaphores[0] queue (VkQueue 0x233e03394c0) is waiting on semaphore (VkSemaphore 0x160000000016) that has no way to be signaled.
+The Vulkan spec states: All elements of the pWaitSemaphores member of all elements of pSubmits created with a VkSemaphoreType of VK_SEMAPHORE_TYPE_BINARY must reference a semaphore signal operation that has been submitted for execution and any semaphore signal operations on which it depends must have also been submitted for execution (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/cmdbuffers.html#VUID-vkQueueSubmit-pWaitSemaphores-03238)
+Objects: 2
+    [0] VkSemaphore 0x160000000016
+    [1] VkQueue 0x233e03394c0
+
+Validation Error: [ UNASSIGNED-VkPresentInfoKHR-pImageIndices-MissingAcquireWait ] | MessageID = 0x1b6b9ef2
+(Warning - This VUID has now been reported 10 times, which is the duplicated_message_limit value, this will be the last time reporting it).
+vkQueuePresentKHR(): pPresentInfo->pImageIndices[0] was acquired with a semaphore VkSemaphore 0x130000000013 that has not since been waited on
+Objects: 2
+    [0] VkImage 0x40000000004
+    [1] VkSemaphore 0x130000000013
+
+Validation Error: [ VUID-vkAcquireNextImageKHR-semaphore-01286 ] | MessageID = 0xe9e4b2a9
+(Warning - This VUID has now been reported 10 times, which is the duplicated_message_limit value, this will be the last time reporting it).
+vkAcquireNextImageKHR(): Semaphore must not be currently signaled.
+The Vulkan spec states: If semaphore is not VK_NULL_HANDLE, it must be unsignaled (https://vulkan.lunarg.com/doc/view/1.4.313.2/windows/antora/spec/latest/chapters/VK_KHR_surface/wsi.html#VUID-vkAcquireNextImageKHR-semaphore-01286)
+Objects: 1
+    [0] VkSemaphore 0x130000000013

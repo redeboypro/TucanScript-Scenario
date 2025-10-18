@@ -164,7 +164,7 @@ namespace TucanScript {
 			});
 		}
 
-		inline Undef StringAlloc (const String& str, Boolean native) {
+		inline Undef StringAlloc (const String& str) {
 			auto address = static_cast<QWord>(Found (m_StringLiterals, str));
 			if (!IsValidID (address)) {
 				address = m_StringLiterals.size ();
@@ -172,7 +172,7 @@ namespace TucanScript {
 			}
 
 			m_Instructions.push_back (VM::Instruction {
-				.m_Op  = native ? VM::CSTRALLOC : VM::STRALLOC,
+				.m_Op  = VM::CSTRALLOC,
 				.m_Val = VM::Val {
 					.m_Type = VM::UINT64_T,
 					.m_Data = VM::Word {
