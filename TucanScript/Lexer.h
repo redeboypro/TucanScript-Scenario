@@ -129,12 +129,12 @@ namespace TucanScript::Lexer {
 		{ "imp",      TokenType::IMP },
 		{ "break",    TokenType::BREAK },
 		{ "continue", TokenType::CONTINUE },
-		{ "include",  TokenType::INCLUDE },
+		{ "link",     TokenType::INCLUDE },
 		{ "async",    TokenType::ASYNC },
 	};
 
 	class Tokenizer final {
-		inline Boolean IsDigitOrMinus (const Sym sym) {
+		static inline Boolean IsDigitOrMinus (const Sym sym) {
 			return std::isdigit (sym) || sym Is SymbolMap::MinusChar;
 		}
 

@@ -1,4 +1,4 @@
-hCoroutinesLib = LoadLibrary("Coroutines.dll");
+hCoroutinesLib = LoadLibrary("libCoroutines.dylib");
 
 SetTaskAllocProps = GetProcAddr(hCoroutinesLib, "SetCoroutineProps");
 WaitForEachTask = GetProcAddr(hCoroutinesLib, "WaitForEachTask");

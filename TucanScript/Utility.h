@@ -9,6 +9,7 @@
 #endif
 
 #include <chrono>
+#include <filesystem>
 #include <iostream>
 #include <cstdint>
 #include <ostream>
@@ -64,7 +65,7 @@ namespace TucanScript {
 	#define LogErr(MSG)   std::cerr << MSG << std::endl
 	#define Notify(MSG)   MessageBoxW(nullptr, MSG, L"Log", MB_OK | MB_ICONEXCLAMATION)
 	#define Terminate()   exit(EXIT_FAILURE)
-	#define InvalidID     -1
+	#define InvalidID     (-1)
 	#define IsValidID(ID) (ID != InvalidID)
 #pragma endregion
 
@@ -74,12 +75,22 @@ namespace TucanScript {
 	typedef signed char      SInt8;
 	typedef signed short     SInt16;
 	typedef signed int       SInt32;
+
+#if defined(_WIN32) || defined(_WIN64)
 	typedef signed long long SInt64;
+#else
+    typedef signed long SInt64;
+#endif
 
 	typedef unsigned char      UInt8;
 	typedef unsigned short     UInt16;
 	typedef unsigned int       UInt32;
+
+#if defined(_WIN32) || defined(_WIN64)
 	typedef unsigned long long UInt64;
+#else
+    typedef unsigned long UInt64;
+#endif
 
 	typedef float  Dec32;
 	typedef double Dec64;
@@ -117,16 +128,14 @@ namespace TucanScript {
 
 #pragma region [STL Aliases and Utilities]
 	typedef std::string String;
-	typedef std::uintptr_t IntPtr;
+	typedef std::uintptr_t UIntPtr;
 
 	typedef std::istringstream IStrStream;
+    typedef std::ostringstream OStrStream;
 	typedef std::stringstream  StrStream;
 
 	template <typename T>
 	using Stack = std::stack<T>;
-
-	template <typename T>
-	using SharedPtr = std::shared_ptr<T>;
 
 	template <typename T>
 	using Deque = std::deque<T>;
@@ -195,6 +204,24 @@ namespace TucanScript {
 		buffer << file.rdbuf ();
 		return buffer.str ();
 	}
+
+    inline bool WriteFileContent(const String& filePath, const String& content) {
+        OFileStream file(filePath, std::ios::binary);
+
+        if (!file.is_open()) {
+            LogErr("Error opening file for writing: " << filePath);
+            return false;
+        }
+
+        file << content;
+        if (!file) {
+            LogErr("Error writing to file: " << filePath);
+            return false;
+        }
+
+        file.close();
+        return true;
+    }
 
 	inline Sym* GetNewLPCStr (const String& str) {
 		Sym* buffer = new Sym[NextWord (str.size ())];

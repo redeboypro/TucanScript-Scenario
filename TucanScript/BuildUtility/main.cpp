@@ -3,18 +3,21 @@
 
 using namespace TucanScript;
 
-#define ExtSeparator "."
-#define BinaryExt    ".tbin"
+#define BinaryExt     ".tbin"
+#define MetaHeaderExt ".h"
 
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 	if (nArgs <= 1) {
 		return nArgs;
 	}
 
-	String entryFilePath  = args[1];
-	String binaryFilePath = entryFilePath.substr (Zero, entryFilePath.find_last_of (ExtSeparator)).append (BinaryExt);
+	String sEntryFilePath  = args[1];
+    String sFilePathTemplate = sEntryFilePath.substr (Zero, sEntryFilePath.find_last_of ('.'));
 
-	Log ("Output binary: " << binaryFilePath);
+    String sBinaryFilePath = sFilePathTemplate + BinaryExt;
+    String sMetaFilePath = sFilePathTemplate + MetaHeaderExt;
+
+	Log ("Output binary: " << sBinaryFilePath);
 
 	String includeDir;
 	if (nArgs > 2) {
@@ -27,7 +30,7 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 	compiler->GenerateInstructionList (
 		lexer->ProcessIncludeDirectories (
 			lexer->Tokenize (
-				ReadFileContent (entryFilePath)
+				ReadFileContent (sEntryFilePath)
 			), 
 			includeDir
 		)
@@ -36,10 +39,12 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 	VM::Asm assembly = compiler->GetAssemblyCode ();
 	VM::ReadOnlyData roData = compiler->GetReadOnlyData ();
 
+    WriteFileContent (sMetaFilePath, compiler->MakeMetaHeader ());
+
 	delete lexer;
 	delete compiler;
 
-	Binary::BinaryBuilder::Build (roData, assembly, binaryFilePath);
+	Binary::BinaryBuilder::Build (roData, assembly, sBinaryFilePath);
 
 	delete assembly.m_Memory;
 	VM::DeleteROData (roData);

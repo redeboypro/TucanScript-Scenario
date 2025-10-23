@@ -54,7 +54,7 @@ namespace TucanScript {
 		UInt64                       m_NumAutoPtrs {};
 		WhileInfo                    m_EmptyWhileStmt;
 
-		inline SInt32 Precedence (Lexer::TokenType type) {
+		static inline SInt32 Precedence (Lexer::TokenType type) {
 			switch (type) {
 				case Lexer::TokenType::CMPE:
 				case Lexer::TokenType::CMPG:
@@ -278,7 +278,7 @@ namespace TucanScript {
 			{ "Free",            VM::MEMDEALLOC },
 			{ "Size",            VM::MEMSIZE },
 			{ "Return",          { VM::RETURN, true } },
-			{ "Exit",            VM::HALT },
+			{ "Kill",            VM::HALT },
 
 			//Native wrapping
 			{ "LoadLibrary",     VM::LOADLIB },
@@ -395,6 +395,7 @@ namespace TucanScript {
 		VM::ReadOnlyData GetReadOnlyData ();
 		VM::Asm GetAssemblyCode ();
 		Undef LogInstr ();
+        String MakeMetaHeader();
 	};
 }
 

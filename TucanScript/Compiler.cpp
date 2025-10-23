@@ -430,7 +430,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						}
 						else {
 							funInfo.m_Calls.push_back (m_Instructions.size ());
-							Push (0x0LL);
+							Push (0x0);
 						}
 						continue;
 					}
@@ -469,7 +469,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						}
 						continue;
 					}
-					Push (m_DefinedVars.size (), VM::RADDRESS_T);
+					Push ((SInt32) m_DefinedVars.size (), VM::RADDRESS_T);
 					m_DefinedVars.push_back (*strValuePtr);
 				}
 				break;
@@ -561,10 +561,75 @@ VM::ReadOnlyData TucanScript::Compiler::GetReadOnlyData () {
 
 VM::Asm TucanScript::Compiler::GetAssemblyCode () {
 	const Size nInstr = m_Instructions.size ();
-	VM::Instruction* instr = new VM::Instruction[nInstr];
+	auto* instr = new VM::Instruction[nInstr];
 	std::memcpy (instr, m_Instructions.data (), nInstr * sizeof(VM::Instruction));
 	return VM::Asm {
 		.m_Memory = instr,
 		.m_Size   = nInstr
 	};
+}
+
+struct CKeywords final {
+    constexpr static auto* Struct    = nameof(struct);
+    constexpr static auto* Final     = nameof(final);
+    constexpr static auto* Include   = nameof(#include);
+    constexpr static auto* ConstExpr = nameof(constexpr);
+    constexpr static auto* Static    = nameof(static);
+    constexpr static auto* QWord     = nameof(UInt64);
+};
+
+String Compiler::MakeMetaHeader() {
+    OStrStream metaBuffer;
+
+#define Next() metaBuffer << LineSeparators::NextLine
+#define Space() metaBuffer << "\n\n"
+#define Include(HEADER) metaBuffer <<        \
+    CKeywords::Include << ' ' <<             \
+    Lexer::SymbolMap::QuoteChar << HEADER << \
+    Lexer::SymbolMap::QuoteChar
+#define MakeStruct(NAME) metaBuffer << \
+    CKeywords::Struct << ' ' <<        \
+    NAME << ' ' <<                     \
+    CKeywords::Final << " {"
+#define CloseStruct() metaBuffer << "};"
+#define Indent() metaBuffer << "    "
+#define MakeWord(NAME, VALUE) metaBuffer << \
+    CKeywords::ConstExpr << ' ' <<   \
+    CKeywords::Static << ' ' <<      \
+    CKeywords::QWord << ' ' <<       \
+    NAME << " = " << VALUE << ';'
+
+    Include("Utility.h");
+    Space();
+
+    MakeStruct("ExtractedVariablesMeta");
+    Next();
+
+    for (UInt64 i = 0; i < m_DefinedVars.size(); ++i) {
+        Indent();
+        MakeWord(m_DefinedVars[i], i);
+        Next();
+    }
+
+    CloseStruct();
+    Space();
+
+    MakeStruct("ExtractedFunctionsMeta");
+    Next();
+
+    for (auto& fun : m_DefinedFuncs) {
+        Indent();
+        MakeWord(fun.first, fun.second.m_Address);
+        Next();
+    }
+
+    CloseStruct();
+
+    return metaBuffer.str();
+
+#undef Include
+#undef MakeStruct
+#undef CloseStruct
+#undef Indent
+#undef MakeWord
 }

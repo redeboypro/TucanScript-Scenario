@@ -441,7 +441,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			frame.m_Depth--;
 
 			if ((qInstr = PrevWord (GetLastCall (frame).m_Address)) == _Exit) {
-				return qInstr;
+				return (SInt32) qInstr;
 			}
 			break;
 		}
@@ -940,10 +940,10 @@ TucanScript::VM::VirtualMachine::VirtualMachine (
 	UInt64 stackSize, 
 	UInt64 fixedMemSize, 
 	UInt64 callDepth, 
-	Asm&& asm_, 
+	Asm asm_,
 	UnsafeDeallocator* staticDeallocator) :
 	m_Stack (stackSize),
-	m_Asm (std::move (asm_)),
+	m_Asm (asm_),
 	m_hGlobalDeallocator (staticDeallocator),
 	m_JmpMemory {
 		.m_Sequence = new Call[NextWord (callDepth)],
@@ -1018,7 +1018,7 @@ Undef TucanScript::VM::VirtualMachine::WaitForYield () {
 }
 
 Undef TucanScript::VM::TaskScheduler::Resize (Size newCapacity) {
-	HTask* newArray = new HTask[newCapacity];
+	auto* newArray = new HTask[newCapacity];
 	for (QWord qTask = Zero; qTask < Min(m_Capacity, newCapacity); ++qTask) {
 		newArray[qTask] = m_Tasks[qTask];
 	}
@@ -1034,7 +1034,7 @@ TucanScript::VM::HTask TucanScript::VM::TaskScheduler::Run (QWord qInstr) {
 		task = m_Tasks[qTask];;
 		if (!task->m_Running) {
 			task->m_Running = true;
-			task->m_qInstr = qInstr;
+			task->m_qInstr = (SInt64) qInstr;
 			
 			delete task->m_hStack;
 			task->m_hStack = new VirtualStack (m_TaskMemoryProps.m_StackSize);

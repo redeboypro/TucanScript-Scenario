@@ -5,7 +5,12 @@
 
 #define LogInstErr(INST, MSG)  std::cerr << INST ": " MSG << std::endl
 
+#if defined(_WIN32) || defined(_WIN64)
 #define _Success 0x1ll
+#else
+#define _Success 0x1l
+#endif
+
 #define _Fail    -(_Success)
 #define _Exit    _Fail
 
@@ -32,7 +37,7 @@ namespace TucanScript::VM {
 #define ExC_FloatArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_F32
 #define ExC_DoubleArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_F64
 #define ExC_ManagedArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr
-#define ExC_StringArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr.m_Memory.m_hRawBuf
+#define ExC_StringArg(ARG_ID) ((char*) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr->m_Memory.m_hRawBuf)
 #define ExC_NativePtrArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_NativePtr
 
 #define ExC_Args VM::VirtualMachine* vm, \
@@ -395,11 +400,11 @@ namespace TucanScript::VM {
 
 		HTask Run (QWord qInstr);
 
-		constexpr Size GetCapacity () const {
+		[[nodiscard]] constexpr Size GetCapacity () const {
 			return m_Capacity;
 		}
 
-		HTask GetTask (QWord qTask) const {
+		[[nodiscard]] HTask GetTask (QWord qTask) const {
 			return m_Tasks[qTask];
 		}
 
@@ -431,21 +436,21 @@ namespace TucanScript::VM {
 		VM::Val PopUnpack (VirtualStack& stack, JmpMemory& frame);
 		Undef Jmp (SInt64 & iInst, Instruction& instruction);
 
-		inline Call& GetLastCall (JmpMemory& jmpMemory) const {
+		static inline Call& GetLastCall (JmpMemory& jmpMemory) {
 			return jmpMemory.m_Sequence[jmpMemory.m_Depth];
 		}
 
 		VM::Val* GetMemoryAtAddress (JmpMemory& frame, const Val& src, Val* defaultValue) const;
 
-		inline UInt64 GetMemorySize (const Val& value) const {
+		[[nodiscard]] static inline UInt64 GetMemorySize (const Val& value) {
 			return value.m_Data.m_ManagedPtr->m_Size;
 		}
 
-		Val* GetMemoryAtRAddress (SInt32 address) const {
+		[[nodiscard]] Val* GetMemoryAtRAddress (SInt32 address) const {
 			return &m_FixedMemory.m_Memory[address];
 		}
 
-		Val* GetMemoryAtLRAddress (JmpMemory& frame, SInt32 address) const {
+		static Val* GetMemoryAtLRAddress (JmpMemory& frame, SInt32 address) {
 			return &GetLastCall (frame).m_Memory.m_Memory[address];
 		}
 
@@ -582,7 +587,7 @@ namespace TucanScript::VM {
 
 		Undef MemCopy(VirtualStack& stack, MemCpyFrameArgs frameArgs, Val & dest, const Val& src, Boolean pushBack = true);
 
-		inline Boolean IsTrue (const Val& value) const {
+		static inline Boolean IsTrue (const Val& value) {
 			return (value.m_Type Is BYTE_T  && value.m_Data.m_UC)   ||
 				   (value.m_Type Is CHAR_T  && value.m_Data.m_C)    ||
 				   (value.m_Type Is INT32_T && value.m_Data.m_I32)  ||
@@ -599,7 +604,7 @@ namespace TucanScript::VM {
 			VirtualStack& stack,
 			const MemCpyFrameArgs& frameArgs);
 
-		Val GetRawElement (Managed* managedMemory, UInt64 index) {
+		static Val GetRawElement (Managed* managedMemory, UInt64 index) {
 			auto rawMemory =
 			#if CHAR_MIN < 0
 				(SInt8*) managedMemory;
@@ -632,7 +637,7 @@ namespace TucanScript::VM {
 			UInt64 stackSize,
 			UInt64 fixedMemSize,
 			UInt64 callDepth,
-			Asm&& asm_,
+			Asm asm_,
 			UnsafeDeallocator* hStaticDeallocator);
 
 		~VirtualMachine ();
@@ -656,7 +661,7 @@ namespace TucanScript::VM {
 
 		Undef WaitForYield ();
 		Undef ResumeTask (HTask hTask);
-		inline Undef CloseTask (HTask hTask) {
+		static inline Undef CloseTask (HTask hTask) {
 			hTask->m_Running = false;
 			delete hTask->m_hStack;
 			hTask->m_hStack = nullptr;
@@ -683,7 +688,7 @@ namespace TucanScript::VM {
 			}
 		}
 
-		inline Boolean IPtrIsOutOfProgram () const {
+		[[nodiscard]] inline Boolean IPtrIsOutOfProgram () const {
 			return m_IPtr < Zero || m_IPtr >= m_Asm.m_Size || m_Free;
 		}
 
@@ -691,7 +696,7 @@ namespace TucanScript::VM {
 			m_IPtr = _Exit; 
 		}
 
-		inline Undef WriteChunk (Size qChunkPtr, const Val& chunkVal) {
+		inline Undef WriteChunk (Size qChunkPtr, const Val& chunkVal) const {
 			m_FixedMemory.m_Memory[qChunkPtr] = chunkVal;
 		}
 

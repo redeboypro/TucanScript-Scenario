@@ -16,17 +16,15 @@ VM::VirtualMachine* vm { nullptr };
 static Undef FreeVM () { vm->Free (); }
 
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
-	//if (nArgs <= 1) {
-	//	LogErr ("Invalid binary file path argument!");
-	//	return InvalidSignature;
-	//}
-
-	_CrtSetDbgFlag (_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF | _CRTDBG_CHECK_ALWAYS_DF);
+	if (nArgs <= 1) {
+		LogErr ("Invalid binary file path argument!");
+		return InvalidSignature;
+	}
 
 	TucanScript::VM::ReadOnlyData roData {};
 	TucanScript::VM::Asm asm_ {};
 
-	TucanScript::Binary::BinaryBuilder::Decompose ("D:\\TucanScript\\Bin\\Samples\\CoroutineTest.tbin", asm_, roData);
+	TucanScript::Binary::BinaryBuilder::Decompose (args[1], asm_, roData);
 
 	auto staticDealloc = new TucanScript::VM::UnsafeDeallocator ();
 	staticDealloc->PutReadOnlyData (roData);
@@ -50,17 +48,18 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 		stackSize,
 		fixedMemorySize,
 		callDepthLimit,
-		std::move (asm_),
+		asm_,
 		staticDealloc);
 
 	atexit (FreeVM);
 
-	Log ("Run");
+    if (!vm) {
+        LogErr ("Virtual machine is already killed!");
+        return _Fail;
+    }
 
-	vm->Run ();
+    vm->Run();
+    delete vm;
 
-	Log ("Complete");
-
-	delete vm;
 	return Zero;
 }

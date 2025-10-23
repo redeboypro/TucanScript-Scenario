@@ -47,7 +47,10 @@ ExternC {
 	TucanAPI Undef R_BufOffset (ExC_Args) {
 		Undef* pBuffer = ExC_NativePtrArg (0);
 		QWord szIncrement = ExC_QWordArg (1);
-		stack->Push<Undef*, VM::NATIVEPTR_T> (pBuffer + szIncrement, &VM::Word::m_NativePtr);
+        auto pResult = static_cast<Undef*>(
+                reinterpret_cast<std::byte*>(pBuffer) + szIncrement
+        );
+		stack->Push<Undef*, VM::NATIVEPTR_T> (pResult, &VM::Word::m_NativePtr);
 	}
 #pragma endregion
 

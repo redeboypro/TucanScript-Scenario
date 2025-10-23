@@ -77,27 +77,27 @@ Lexer::Token TucanScript::Lexer::Tokenizer::CreateToken (const TokenVal& value, 
 			TokenVal tokenValue;
 			switch (numericType) {
 				case TokenType::INT32: {
-					ParseAndApplyNumeric<SInt32> (tokenStr, tokenValue);
+					ParseAndApplyNumeric<SInt32> (unparsedToken, tokenValue);
 					break;
 				}
 				case TokenType::INT64: {
-					ParseAndApplyNumeric<SInt64> (tokenStr, tokenValue);
+					ParseAndApplyNumeric<SInt64> (unparsedToken, tokenValue);
 					break;
 				}
 				case TokenType::UINT32: {
-					ParseAndApplyNumeric<UInt32> (tokenStr, tokenValue);
+					ParseAndApplyNumeric<UInt32> (unparsedToken, tokenValue);
 					break;
 				}
 				case TokenType::UINT64: {
-					ParseAndApplyNumeric<UInt64> (tokenStr, tokenValue);
+					ParseAndApplyNumeric<UInt64> (unparsedToken, tokenValue);
 					break;
 				}
 				case TokenType::FLOAT32: {
-					ParseAndApplyNumeric<Dec32> (tokenStr, tokenValue);
+					ParseAndApplyNumeric<Dec32> (unparsedToken, tokenValue);
 					break;
 				}
 				case TokenType::FLOAT64: {
-					ParseAndApplyNumeric<Dec64> (tokenStr, tokenValue);
+					ParseAndApplyNumeric<Dec64> (unparsedToken, tokenValue);
 					break;
 				}
 			}
@@ -247,21 +247,27 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 Lexer::TokenList TucanScript::Lexer::Tokenizer::ProcessIncludeDirectories (const TokenList& tokens, String includeSearchDir) {
 	TokenList processedToken;
 
-	if (!includeSearchDir.empty () && !(includeSearchDir.ends_with (SymbolMap::SlashChar) or includeSearchDir.ends_with ('/'))) {
-		includeSearchDir += SymbolMap::SlashChar;
-	}
+    if (!includeSearchDir.empty())
+    {
+        while (includeSearchDir.back() == '/' || includeSearchDir.back() == '\\') {
+            includeSearchDir.pop_back();
+        }
+
+        includeSearchDir = (std::filesystem::path(includeSearchDir) / "").string();
+    }
 
 	for (Size iToken = Zero; iToken < tokens.size (); iToken++) {
 		auto& token = tokens[iToken];
 		if (token.m_Type Is TokenType::INCLUDE) {
-			const String* strValuePtr = std::get_if<String> (&tokens[++iToken].m_Val);
+			const auto* strValuePtr = std::get_if<String> (&tokens[++iToken].m_Val);
 			if (strValuePtr && iToken < PrevWord (tokens.size ())) {
-				TokenList includeTokens = ProcessIncludeDirectories (
-					Tokenize (
-						ReadFileContent (includeSearchDir + *strValuePtr)
-					), 
-					includeSearchDir
-				);
+                auto fullPath = std::filesystem::path(includeSearchDir) / *strValuePtr;
+
+                TokenList includeTokens = ProcessIncludeDirectories(
+                        Tokenize(ReadFileContent(fullPath.string())),
+                        includeSearchDir
+                );
+
 				processedToken.insert (processedToken.end (), includeTokens.begin (), includeTokens.end ());
 			}
 			else {

@@ -67,11 +67,11 @@ Undef TucanScript::Binary::BinaryBuilder::Decompose (const String& inFilePath, V
                 .m_Data = word
             }
         };
-        aInstr.push_back (std::move (instr));
+        aInstr.push_back (instr);
         qCaret += wordSize;
     }
 
-    VM::Instruction* instrBuffer = new VM::Instruction[aInstr.size ()];
+    auto* instrBuffer = new VM::Instruction[aInstr.size ()];
     std::memcpy (instrBuffer, aInstr.data (), aInstr.size () * sizeof(VM::Instruction));
 
     asm_.m_Memory = instrBuffer,
@@ -129,7 +129,7 @@ Undef TucanScript::Binary::BinaryBuilder::Build (
         return;
     }
 
-    outFileStream.write (buffer, totalSize);
+    outFileStream.write (buffer, (SInt64) totalSize);
     outFileStream.close ();
     delete[] buffer;
 }
