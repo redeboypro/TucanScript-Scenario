@@ -124,7 +124,6 @@ TucanAPI Undef TextField(ExC_Args) {
             TucanScript::DWord uLastIndex = 4;
 
             if (args->m_Size > uLastIndex) {
-
                 if (args->m_Memory[uLastIndex].m_Type == TucanScript::VM::MANAGED_T) {
                     [hLabel setStringValue: [NSString stringWithUTF8String: ExC_StringArg (uLastIndex)]];
                     ++uLastIndex;
@@ -201,10 +200,10 @@ TucanAPI Undef TextField_GetText(ExC_Args) {
             return;
         }
 
-        __block NSString* result = nil;
+        __block NSString* sResult = nil;
 
         void (^ReadBlock)(void) = ^{
-            result = [field stringValue];
+            sResult = [field stringValue];
         };
 
         if ([NSThread isMainThread]) {
@@ -213,8 +212,8 @@ TucanAPI Undef TextField_GetText(ExC_Args) {
             dispatch_sync(dispatch_get_main_queue(), ReadBlock);
         }
 
-        const Sym* pCStr = strdup([result UTF8String]);
-        stack->Push<VM::Managed*, VM::MANAGED_T> (vm->GetAllocator()->Alloc ((Undef*) pCStr, [result length]), &VM::Word::m_ManagedPtr);
+        const Sym* pCStr = strdup([sResult UTF8String]);
+        stack->Push<VM::Managed*, VM::MANAGED_T> (vm->GetAllocator()->Alloc ((Undef*) pCStr, [sResult length]), &VM::Word::m_ManagedPtr);
     }
 }
 
@@ -231,18 +230,18 @@ TucanAPI Undef Button(ExC_Args) {
         __block NSButton* hButton = nil;
 
         void (^CreateButton)(void) = ^{
-            hButton = [[NSButton alloc] initWithFrame:NSMakeRect(fX,fY,fWidth,fHeight)];
-            [hButton setTitle:[NSString stringWithUTF8String:pLabelContent]];
-            [hButton setBezelStyle:NSBezelStyleRounded];
-            [hButton setButtonType:NSButtonTypeMomentaryPushIn];
-            [hButton setTarget:gs_Delegate];
-            [hButton setAction:@selector(OnButtonClicked:)];
+            hButton = [[NSButton alloc] initWithFrame: NSMakeRect(fX,fY,fWidth,fHeight)];
+            [hButton setTitle: [NSString stringWithUTF8String: pLabelContent]];
+            [hButton setBezelStyle: NSBezelStyleRounded];
+            [hButton setButtonType: NSButtonTypeMomentaryPushIn];
+            [hButton setTarget: gs_Delegate];
+            [hButton setAction: @selector(OnButtonClicked:)];
 
             XGUIButtonFlag* flag = [XGUIButtonFlag new];
             flag.m_pFlag = pPressedFlag;
             objc_setAssociatedObject(hButton, REF_BUTTON_STATE, flag, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-            [[gs_Delegate.m_hWindow contentView] addSubview:hButton];
+            [[gs_Delegate.m_hWindow contentView] addSubview: hButton];
 
             stack->Push<Undef*, VM::NATIVEPTR_T>((Undef*) hButton, &VM::Word::m_NativePtr);
         };

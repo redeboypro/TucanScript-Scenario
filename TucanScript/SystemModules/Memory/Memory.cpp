@@ -52,6 +52,10 @@ ExternC {
         );
 		stack->Push<Undef*, VM::NATIVEPTR_T> (pResult, &VM::Word::m_NativePtr);
 	}
+
+    TucanAPI Undef R_NullPtr (ExC_Args) {
+        stack->Push<Undef*, VM::NATIVEPTR_T> (nullptr, &VM::Word::m_NativePtr);
+    }
 #pragma endregion
 
 	TucanAPI Undef Merge (ExC_Args) {

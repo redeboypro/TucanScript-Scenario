@@ -710,6 +710,12 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 		case CMPE: {
 			auto b = PopUnpack (stack, frame);
 			auto a = PopUnpack (stack, frame);
+
+            if (a.m_Type == NATIVEPTR_T) {
+                stack.Push (a.m_Data.m_NativePtr == b.m_Data.m_NativePtr);
+                break;
+            }
+
 			ApplyOp (a, b, == );
 			break;
 		}

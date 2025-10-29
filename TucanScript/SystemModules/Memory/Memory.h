@@ -22,6 +22,7 @@ ExternC {
 	TucanAPI Undef R_StrCpy (ExC_Args);
 	TucanAPI Undef R_WriteWord (ExC_Args);
 	TucanAPI Undef R_BufOffset (ExC_Args);
+    TucanAPI Undef R_NullPtr (ExC_Args);
 #pragma endregion
 
 	TucanAPI Undef Merge (ExC_Args);
