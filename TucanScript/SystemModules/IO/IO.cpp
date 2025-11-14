@@ -49,7 +49,7 @@ ExternC {
     }
 
     TucanAPI Undef IO_FileTell (ExC_Args) {
-        stack->Push (std::ftell ((FILE*) ExC_NativePtrArg(0)));
+        stack->Push ((UInt64) std::ftell ((FILE*) ExC_NativePtrArg(0)));
     }
 
     TucanAPI Undef IO_FileEOF (ExC_Args) {
@@ -70,5 +70,14 @@ ExternC {
 
     TucanAPI Undef IO_Stderr (ExC_Args) {
         stack->Push<Undef*, VM::NATIVEPTR_T> (stderr, &VM::Word::m_NativePtr);
+    }
+
+    TucanAPI Undef IO_CanReadFD (ExC_Args) {
+        SInt32 fd = ExC_Int32Arg(0);
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+        struct timeval tv = {Zero, Zero};
+        stack->Push(select(fd + 1, &fds, nullptr, nullptr, &tv) > 0);
     }
 }

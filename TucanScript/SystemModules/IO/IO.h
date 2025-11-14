@@ -2,6 +2,9 @@
 #define IO_H
 
 #include "../../VirtualMachine.h"
+#undef _Exit
+
+#include <unistd.h>
 
 using namespace TucanScript;
 
@@ -20,6 +23,7 @@ ExternC {
     TucanAPI Undef IO_Stdin (ExC_Args);
     TucanAPI Undef IO_Stdout (ExC_Args);
     TucanAPI Undef IO_Stderr (ExC_Args);
+    TucanAPI Undef IO_CanReadFD (ExC_Args);
 }
 
 #endif

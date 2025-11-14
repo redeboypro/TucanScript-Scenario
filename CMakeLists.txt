@@ -51,6 +51,11 @@ target_link_libraries(XGUI
 		"-framework AppKit"
 )
 
+add_library(Networking SHARED
+		TucanScript/SystemModules/Sockets/Networking.cpp TucanScript/SystemModules/Sockets/Networking.h
+		TucanScript/Utility.h
+		TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+
 add_library (Math SHARED
 			TucanScript/SystemModules/Math/Math.h TucanScript/SystemModules/Math/Math.cpp
 			TucanScript/Utility.h
