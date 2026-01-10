@@ -162,7 +162,7 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 						continue;
 					}
 
-					else if (BothAre<TokenType::CMPG> (curType, nextType)) {
+					if (BothAre<TokenType::CMPG> (curType, nextType)) {
 						rawTokens.push_back (std::move (CreateToken (Zero, TokenType::READ)));
 						iChar++;
 						continue;
@@ -220,12 +220,11 @@ Lexer::TokenList TucanScript::Lexer::Tokenizer::Tokenize (const String& source) 
 				strValueUnit = source[++iChar];
 			}
 
-			TokenType strTokenType = TokenType::STR;
+			auto strTokenType = TokenType::STR;
 
 			constexpr static auto R_PREFIX = 'r';
 
-			UInt64 iPostfixChar = NextWord (iChar);
-			if (iPostfixChar < source.size () && source[iPostfixChar] == R_PREFIX) {
+			if (UInt64 iPostfixChar = NextWord (iChar); iPostfixChar < source.size () && source[iPostfixChar] == R_PREFIX) {
 				strTokenType = TokenType::CSTR;
 				++iChar;
 			}

@@ -42,12 +42,12 @@ using namespace TucanScript;
 }
 @end
 
-static XGUIApplicationDelegate* gs_Delegate = nil;
-
 extern "C" {
 TucanAPI Undef Frame(ExC_Args) {
     Dec32 fWidth = ExC_FloatArg(0);
     Dec32 fHeight = ExC_FloatArg(1);
+
+    XGUIApplicationDelegate* pAppDelegate = nil;
 
     @autoreleasepool {
         if (NSApp == nil) {
@@ -55,17 +55,15 @@ TucanAPI Undef Frame(ExC_Args) {
             [NSApp setActivationPolicy: NSApplicationActivationPolicyRegular];
         }
 
-        if (!gs_Delegate) {
-            gs_Delegate = [[XGUIApplicationDelegate alloc] init];
-            [NSApp setDelegate: gs_Delegate];
-        }
+        pAppDelegate = [[XGUIApplicationDelegate alloc] init];
+        [NSApp setDelegate: pAppDelegate];
 
         NSRect screenRect = [[NSScreen mainScreen] frame];
         NSRect rect = NSMakeRect((screenRect.size.width - fWidth) * 0.5f,
                                  (screenRect.size.height - fHeight) * 0.5f,
                                  fWidth, fHeight);
 
-        gs_Delegate.m_hWindow = [[NSWindow alloc]
+        pAppDelegate.m_hWindow = [[NSWindow alloc]
                 initWithContentRect:rect
                           styleMask: (NSWindowStyleMaskTitled |
                                       NSWindowStyleMaskClosable |
@@ -75,19 +73,22 @@ TucanAPI Undef Frame(ExC_Args) {
 
         NSString* pTitle = [NSString stringWithUTF8String: ExC_StringArg(2)];
 
-        [gs_Delegate.m_hWindow setTitle: pTitle];
-        [gs_Delegate.m_hWindow makeKeyAndOrderFront: nil];
+        [pAppDelegate.m_hWindow setTitle: pTitle];
+        [pAppDelegate.m_hWindow makeKeyAndOrderFront: nil];
         [NSApp activateIgnoringOtherApps: YES];
 
-        [[NSNotificationCenter defaultCenter] addObserver: gs_Delegate
+        [[NSNotificationCenter defaultCenter] addObserver: pAppDelegate
                                                  selector: @selector(WindowWillClose:)
                                                      name: NSWindowWillCloseNotification
-                                                   object: gs_Delegate.m_hWindow];
+                                                   object: pAppDelegate.m_hWindow];
     }
+
+    stack->Push<Undef*, VM::NATIVEPTR_T> ((Undef*) pAppDelegate, &VM::Word::m_NativePtr);
 }
 
 TucanAPI Undef IsAppRunning(ExC_Args) {
-    stack->Push (gs_Delegate && !gs_Delegate.m_WindowClosed);
+    auto pAppDelegate = (XGUIApplicationDelegate*) ExC_NativePtrArg(0);
+    stack->Push (pAppDelegate && !pAppDelegate.m_WindowClosed);
 }
 
 TucanAPI Undef Flush(ExC_Args) {
@@ -107,12 +108,14 @@ TucanAPI Undef Flush(ExC_Args) {
 
 TucanAPI Undef TextField(ExC_Args) {
     @autoreleasepool {
-        Dec32 fX         = ExC_FloatArg(0);
-        Dec32 fY         = ExC_FloatArg(1);
-        Dec32 fWidth     = ExC_FloatArg(2);
-        Dec32 fHeight    = ExC_FloatArg(3);
+        Dec32 fX         = ExC_FloatArg(1);
+        Dec32 fY         = ExC_FloatArg(2);
+        Dec32 fWidth     = ExC_FloatArg(3);
+        Dec32 fHeight    = ExC_FloatArg(4);
 
-        if (!gs_Delegate || !gs_Delegate.m_hWindow) {
+        auto pAppDelegate = (XGUIApplicationDelegate*) ExC_NativePtrArg(0);
+
+        if (!pAppDelegate || !pAppDelegate.m_hWindow) {
             stack->Push((SInt32) _Fail);
             return;
         }
@@ -150,7 +153,7 @@ TucanAPI Undef TextField(ExC_Args) {
                 }
             }
 
-            NSView* hContentView = [gs_Delegate.m_hWindow contentView];
+            NSView* hContentView = [pAppDelegate.m_hWindow contentView];
             if (hContentView) {
                 [hContentView addSubview: hLabel];
                 hCreatedLabel = hLabel;
@@ -219,13 +222,15 @@ TucanAPI Undef TextField_GetText(ExC_Args) {
 
 TucanAPI Undef Button(ExC_Args) {
     @autoreleasepool {
-        Dec32 fX = ExC_FloatArg(0);
-        Dec32 fY = ExC_FloatArg(1);
-        Dec32 fWidth = ExC_FloatArg(2);
-        Dec32 fHeight = ExC_FloatArg(3);
-        const char* pLabelContent = ExC_StringArg(4);
+        Dec32 fX = ExC_FloatArg(1);
+        Dec32 fY = ExC_FloatArg(2);
+        Dec32 fWidth = ExC_FloatArg(3);
+        Dec32 fHeight = ExC_FloatArg(4);
+        const char* pLabelContent = ExC_StringArg(5);
 
-        auto* pPressedFlag = (SInt32*) ExC_NativePtrArg(5);
+        auto pAppDelegate = (XGUIApplicationDelegate*) ExC_NativePtrArg(0);
+
+        auto* pPressedFlag = (SInt32*) ExC_NativePtrArg(6);
 
         __block NSButton* hButton = nil;
 
@@ -234,14 +239,14 @@ TucanAPI Undef Button(ExC_Args) {
             [hButton setTitle: [NSString stringWithUTF8String: pLabelContent]];
             [hButton setBezelStyle: NSBezelStyleRounded];
             [hButton setButtonType: NSButtonTypeMomentaryPushIn];
-            [hButton setTarget: gs_Delegate];
+            [hButton setTarget: pAppDelegate];
             [hButton setAction: @selector(OnButtonClicked:)];
 
             XGUIButtonFlag* flag = [XGUIButtonFlag new];
             flag.m_pFlag = pPressedFlag;
             objc_setAssociatedObject(hButton, REF_BUTTON_STATE, flag, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
-            [[gs_Delegate.m_hWindow contentView] addSubview: hButton];
+            [[pAppDelegate.m_hWindow contentView] addSubview: hButton];
 
             stack->Push<Undef*, VM::NATIVEPTR_T>((Undef*) hButton, &VM::Word::m_NativePtr);
         };

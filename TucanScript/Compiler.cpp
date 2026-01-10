@@ -4,7 +4,7 @@ using namespace TucanScript;
 
 #define LogOpenStream(DATA)  std::cout << (DATA)
 #define Log2OpenStream(A, B) std::cout << "(" << (A) << "; " << (B) << ")"
-Undef TucanScript::Compiler::LogInstr () {
+Undef Compiler::LogInstr () const {
 	for (auto& instr : m_Instructions) {
 		auto& value = instr.m_Val;
 		LogOpenStream (OpDebugMap.at (instr.m_Op) + ": ");
@@ -56,15 +56,34 @@ Undef TucanScript::Compiler::LogInstr () {
 #undef LogOpenStream
 #undef Log2OpenStream
 
-Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens, VarSet& varSet, Boolean externalContext, WhileInfo& lastWhileStmt) {
+Undef Compiler::GenerateInstructionList (Lexer::TokenList rawTokens, VarSet& varSet, Boolean externalContext, WhileInfo& lastWhileStmt) {
 	Lexer::TokenList argTokens;
 	for (SInt32 iToken = 0; iToken < rawTokens.size (); iToken++) {
-		auto& curToken = rawTokens[iToken];
-		switch (curToken.m_Type) {
+		switch (auto& curToken = rawTokens[iToken]; curToken.m_Type) {
 			case Lexer::TokenType::UNDEFINED: {
 				argTokens.clear ();
 				ReadTo (Lexer::TokenType::SEMICOLON, rawTokens, iToken, argTokens);
 				ProcExpression (argTokens, varSet, externalContext);
+				break;
+			}
+			case Lexer::TokenType::CBUFFER: {
+				argTokens.clear ();
+				ReadTo (Lexer::TokenType::SEMICOLON, rawTokens, ++iToken, argTokens);
+
+				SInt32 iSubToken = InvalidID;
+				const SInt32 nArgs = ProcArgs (argTokens, iSubToken,
+					varSet, externalContext, Lexer::TokenType::LBRACE);
+
+				curToken = argTokens[++iSubToken];
+				if (curToken.m_Type != Lexer::TokenType::UNDEFINED) break;
+
+				auto iDefinedVar = static_cast<SInt32>(varSet.size());
+				varSet.push_back(std::get<String>(curToken.m_Val));
+
+				Push(nArgs);
+				Push(iDefinedVar, externalContext ? VM::ValType::RADDRESS_T : VM::ValType::LRADDRESS_T);
+				ProcArgs (argTokens, iSubToken, varSet, externalContext);
+				Op(VM::CBUFFERALLOC);
 				break;
 			}
 #define LogInvalidSignature(HEAD) LogErr("Function " HEAD ": Invalid function signature")
@@ -229,7 +248,7 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 				GenerateInstructionList (innerTokens, varSet, externalContext, stmtData);
 
 				Op (VM::JMP);
-				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD_signed_raw (&statementBeginId, true);
+				m_Instructions.back ().m_Val = VM::ValUtility::MemCpyQWord (&statementBeginId, true);
 
 				const auto instrEnd = GetInstrEnd ();
 				for (const auto& breakPt : stmtData.m_BreakPoints) {
@@ -246,15 +265,15 @@ Undef TucanScript::Compiler::GenerateInstructionList (Lexer::TokenList rawTokens
 			}
 			case Lexer::TokenType::CONTINUE: {
 				Op (VM::JMP);
-				m_Instructions.back ().m_Val = VM::ValUtility::_QWORD_signed_raw (&lastWhileStmt.m_Entry, true);
+				m_Instructions.back ().m_Val = VM::ValUtility::MemCpyQWord (&lastWhileStmt.m_Entry, true);
 				break;
 			}
 		}
 	}
 }
 
-SInt32 TucanScript::Compiler::ProcArgs (Lexer::TokenList& inTokens, SInt32& iToken, VarSet& varSet, Boolean externalContext, Lexer::TokenType opener) {
-	const SInt64 numTokens = static_cast<SInt64>(inTokens.size ());
+SInt32 Compiler::ProcArgs (Lexer::TokenList& inTokens, SInt32& iToken, VarSet& varSet, Boolean externalContext, Lexer::TokenType opener) {
+	const auto numTokens = static_cast<SInt64>(inTokens.size ());
 	SInt32 numArgs = InvalidSignature;
 	if (iToken < PrevWord (numTokens)) {
 		auto& nextToken = inTokens[NextWord (iToken)];
@@ -269,7 +288,7 @@ SInt32 TucanScript::Compiler::ProcArgs (Lexer::TokenList& inTokens, SInt32& iTok
 					numParen++;
 				}
 				else if (IsRightBracket (nextToken)) {
-					if ((--numParen) <= Zero) {
+					if (--numParen <= Zero) {
 						if (!argExprTokens.empty ()) {
 							ProcExpression (argExprTokens, varSet, externalContext, true);
 							argExprTokens.clear ();
@@ -296,7 +315,7 @@ SInt32 TucanScript::Compiler::ProcArgs (Lexer::TokenList& inTokens, SInt32& iTok
 	return numArgs;
 }
 
-Undef TucanScript::Compiler::ReadTo (Lexer::TokenType itBreaker, Lexer::TokenList& inTokens, SInt32& iToken, Lexer::TokenList& outTokens) {
+Undef Compiler::ReadTo (Lexer::TokenType itBreaker, Lexer::TokenList& inTokens, SInt32& iToken, Lexer::TokenList& outTokens) {
 	if (iToken >= inTokens.size ()) {
 		return;
 	}
@@ -311,7 +330,7 @@ Undef TucanScript::Compiler::ReadTo (Lexer::TokenType itBreaker, Lexer::TokenLis
 	}
 }
 
-Undef TucanScript::Compiler::ProcStatement (Lexer::TokenList& inTokens, SInt32& iToken, Lexer::TokenList& outTokens, Boolean stopOnBreaker) {
+Undef Compiler::ProcStatement (Lexer::TokenList& inTokens, SInt32& iToken, Lexer::TokenList& outTokens, Boolean stopOnBreaker) {
 	iToken++;
 	SInt32 numBrackets = OpenCounter;
 	while (numBrackets > Zero && iToken < inTokens.size ()) {
@@ -329,101 +348,93 @@ Undef TucanScript::Compiler::ProcStatement (Lexer::TokenList& inTokens, SInt32& 
 	}
 }
 
-Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, VarSet& varSet, Boolean externalContext, Boolean innerExpr) {
+Undef Compiler::ProcExpression (Lexer::TokenList expressionTokens, VarSet& varSet, Boolean externalContext, Boolean innerExpr) {
 	Stack<SInt32> rawTokenStack;
-	auto rAddressT = externalContext ? VM::RADDRESS_T : VM::LRADDRESS_T;
-	const SInt64 numTokens = expressionTokens.size ();
+	const auto rAddressT = externalContext ? VM::RADDRESS_T : VM::LRADDRESS_T;
+	const auto numTokens = static_cast<SInt64>(expressionTokens.size());
 	for (SInt32 iToken = Zero; iToken < numTokens; iToken++) {
-		auto& token = expressionTokens[iToken];
-		auto  tokenType = token.m_Type;
-		switch (tokenType) {
+		auto&[m_Val, m_Type] = expressionTokens[iToken];
+		switch (const auto tokenType = m_Type) {
 			case Lexer::TokenType::LBRACE: {
-				SInt32 numArgs = ProcArgs (expressionTokens, --iToken, varSet, externalContext, Lexer::TokenType::LBRACE);
-				if (numArgs > Zero) {
-					Alloc (static_cast<UInt64> (numArgs));
+				if (const SInt32 nArgs = ProcArgs (expressionTokens, --iToken, varSet, externalContext, Lexer::TokenType::LBRACE); nArgs > Zero) {
+					Alloc (static_cast<UInt64> (nArgs));
 				}
 				break;
 			}
 			case Lexer::TokenType::STR: {
-				const String* strValuePtr = std::get_if<String> (&token.m_Val);
-				if (strValuePtr) {
-					StringAlloc (*strValuePtr);
+				if (const String* pStrValuePtr = std::get_if<String> (&m_Val)) {
+					StringAlloc (*pStrValuePtr);
 					Push (0x1);
 					Op (VM::PIN);
 				}
 				break;
 			}
 			case Lexer::TokenType::CSTR: {
-				const String* strValuePtr = std::get_if<String> (&token.m_Val);
-				if (strValuePtr) {
-					StringAlloc (*strValuePtr);
+				if (const String* pStrValuePtr = std::get_if<String> (&m_Val)) {
+					StringAlloc (*pStrValuePtr);
 				}
 				break;
 			}
 			case Lexer::TokenType::CHAR: {
-				Push (std::get<SInt8> (token.m_Val));
+				Push (std::get<SInt8> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::BYTE: {
-				Push (std::get<UInt8> (token.m_Val));
+				Push (std::get<UInt8> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::UINT16: {
-				Push (std::get<UInt16> (token.m_Val));
+				Push (std::get<UInt16> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::UINT32: {
-				Push (std::get<UInt32> (token.m_Val));
+				Push (std::get<UInt32> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::UINT64: {
-				Push (std::get<UInt64> (token.m_Val));
+				Push (std::get<UInt64> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::INT16: {
-				Push (std::get<SInt16> (token.m_Val));
+				Push (std::get<SInt16> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::INT32: {
-				Push (std::get<SInt32> (token.m_Val));
+				Push (std::get<SInt32> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::INT64: {
-				Push (std::get<SInt64> (token.m_Val));
+				Push (std::get<SInt64> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::FLOAT32: {
-				Push (std::get<Dec32> (token.m_Val));
+				Push (std::get<Dec32> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::FLOAT64: {
-				Push (std::get<Dec64> (token.m_Val));
+				Push (std::get<Dec64> (m_Val));
 				break;
 			}
 			case Lexer::TokenType::UNDEFINED: {
-				if (const String* strValuePtr = std::get_if<String> (&token.m_Val)) {
-					InvokableOp invokableOp;
-					if (TryGetDictionaryValue (InvokableOpMap, *strValuePtr, invokableOp)) {
-						SInt32 numArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
+				if (const String* pStrValuePtr = std::get_if<String> (&m_Val)) {
+					if (InvokableOp invokableOp; TryGetDictionaryValue (InvokableOpMap, *pStrValuePtr, invokableOp)) {
+						const SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
 						if (invokableOp.m_PushNumArgs) {
-							Push (numArgs);
+							Push (nArgs);
 						}
 						Op (invokableOp.m_Operation);
 						continue;
 					}
 
-					auto funIt = m_DefinedFuncs.find (*strValuePtr);
-					if (funIt != m_DefinedFuncs.end ()) {
+					if (auto funIt = m_DefinedFuncs.find (*pStrValuePtr); funIt != m_DefinedFuncs.end ()) {
 						auto& funInfo = funIt->second;
 
-						Boolean async = iToken < PrevWord (numTokens) && expressionTokens[NextWord (iToken)].m_Type Is Lexer::TokenType::ASYNC;
+						const Boolean async = iToken < PrevWord (numTokens) && expressionTokens[NextWord (iToken)].m_Type Is Lexer::TokenType::ASYNC;
 						if (async) {
 							iToken++;
 						}
 
-						SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
-
-						if (IsValidID (nArgs)) {
+						if (const SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext); IsValidID(nArgs)) {
 							Push (funInfo.m_NumArgs);
 							Push (static_cast<SInt32>(funInfo.m_DefinedVars.size ()));
 							Call (funInfo, async);
@@ -435,26 +446,21 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						continue;
 					}
 
-					SInt32 rAddressTest1 = Found (varSet, *strValuePtr);
-					if (IsValidID (rAddressTest1) && !externalContext)
+					if (const SInt32 rAddressTest1 = Found (varSet, *pStrValuePtr); IsValidID(rAddressTest1) && !externalContext)
 					{
 						Push (rAddressTest1, rAddressT);
 						continue;
 					}
 
-					SInt32 rAddressTest2 = Found (m_DefinedVars, *strValuePtr);
-					if (IsValidID (rAddressTest2)) {
-						SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext);
-
-						if (nArgs != InvalidSignature) {
+					if (const SInt32 rAddressTest2 = Found (m_DefinedVars, *pStrValuePtr); IsValidID(rAddressTest2)) {
+						if (const SInt32 nArgs = ProcArgs (expressionTokens, iToken, varSet, externalContext); nArgs != InvalidSignature) {
 							Push (nArgs);
 							if (iToken < PrevWord (numTokens) &&
 								expressionTokens[NextWord (iToken)].m_Type Is Lexer::TokenType::DBLDOT) {
 								iToken += 2;
-								if (const String* strValuePtr = std::get_if<String> (&expressionTokens[iToken].m_Val)) {
-									auto funIt = m_DefinedFuncs.find (*strValuePtr);
-									if (funIt != m_DefinedFuncs.end ()) {
-										auto& funInfo = funIt->second;
+								if (const String* pInnerStrValuePtr = std::get_if<String> (&expressionTokens[iToken].m_Val)) {
+									if (auto refFunIt = m_DefinedFuncs.find (*pInnerStrValuePtr); refFunIt != m_DefinedFuncs.end ()) {
+										auto& funInfo = refFunIt->second;
 										Push (funInfo.m_DefinedVars.size ());
 									}
 								}
@@ -469,15 +475,15 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 						}
 						continue;
 					}
-					Push ((SInt32) m_DefinedVars.size (), VM::RADDRESS_T);
-					m_DefinedVars.push_back (*strValuePtr);
+					Push (static_cast<SInt32>(m_DefinedVars.size()), VM::RADDRESS_T);
+					m_DefinedVars.push_back (*pStrValuePtr);
 				}
 				break;
 			}
 			default: {
 				if (RangeInclude (tokenType, Lexer::TokenType::CPY, Lexer::TokenType::OR)) {
 					while (!rawTokenStack.empty ()) {
-						auto  topId = rawTokenStack.top ();
+						const auto  topId = rawTokenStack.top ();
 						auto& topToken = expressionTokens[topId];
 
 						if (!RangeInclude (topToken.m_Type, Lexer::TokenType::CPY, Lexer::TokenType::OR) ||
@@ -506,7 +512,7 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 					}
 					else if (IsRParen (tokenType)) {
 						while (!rawTokenStack.empty ()) {
-							auto  topId = rawTokenStack.top ();
+							const auto topId = rawTokenStack.top ();
 							auto& topToken = expressionTokens[topId];
 
 							if (IsLParen (topToken.m_Type))
@@ -528,26 +534,24 @@ Undef TucanScript::Compiler::ProcExpression (Lexer::TokenList expressionTokens, 
 	}
 
 	while (!rawTokenStack.empty ()) {
-		auto  topId = rawTokenStack.top ();
-		auto& topToken = expressionTokens[topId];
-		if (IsLParen (topToken.m_Type) || IsRParen (topToken.m_Type)) {
+		const auto topId = rawTokenStack.top ();
+		auto& [m_Val, m_Type] = expressionTokens[topId];
+		if (IsLParen (m_Type) || IsRParen (m_Type)) {
 			LogErr ("Mismatched parentheses!");
 		}
-		Op (topToken.m_Type);
+		Op (m_Type);
 		rawTokenStack.pop ();
 	}
 
 	if (!m_Instructions.empty ()) {
-		auto& lastOp = m_Instructions[PrevWord (m_Instructions.size ())];
-		if (!innerExpr) {
-			if ((lastOp.m_Op Is VM::MEMCPY || lastOp.m_Op Is VM::MEMSTORE)) {
-				Op (VM::POP);
-			}
+		if (auto& [m_Op, m_Val] = m_Instructions[PrevWord (m_Instructions.size ())];
+			!innerExpr && (m_Op Is VM::MEMCPY || m_Op Is VM::MEMSTORE)) {
+			Op (VM::POP);
 		}
 	}
 }
 
-VM::ReadOnlyData TucanScript::Compiler::GetReadOnlyData () {
+VM::ReadOnlyData Compiler::GetReadOnlyData () const {
 	const Size nStrLiterals = m_StringLiterals.size ();
 	VM::ReadOnlyData roData {
 		.m_Memory = new Sym* [nStrLiterals],
@@ -559,7 +563,7 @@ VM::ReadOnlyData TucanScript::Compiler::GetReadOnlyData () {
 	return roData;
 }
 
-VM::Asm TucanScript::Compiler::GetAssemblyCode () {
+VM::Asm Compiler::GetAssemblyCode () const {
 	const Size nInstr = m_Instructions.size ();
 	auto* instr = new VM::Instruction[nInstr];
 	std::memcpy (instr, m_Instructions.data (), nInstr * sizeof(VM::Instruction));

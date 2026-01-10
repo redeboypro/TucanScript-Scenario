@@ -1,7 +1,7 @@
 #ifndef MATH_H
 #define MATH_H
 
-#include "time.h"
+#include <ctime>
 #include "../../VirtualMachine.h"
 
 using namespace TucanScript;

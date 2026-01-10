@@ -11,9 +11,9 @@ using namespace TucanScript;
 #define nArg_FixedMemorySize 3
 #define nArg_MaxCallDepth    4
 
-VM::VirtualMachine* vm { nullptr };
+VM::VirtualMachine* pVM { nullptr };
 
-static Undef FreeVM () { vm->Free (); }
+static Undef FreeVM () { pVM->Free (); }
 
 ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 	if (nArgs <= 1) {
@@ -21,13 +21,13 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 		return InvalidSignature;
 	}
 
-	TucanScript::VM::ReadOnlyData roData {};
-	TucanScript::VM::Asm asm_ {};
+	VM::ReadOnlyData roData {};
+	VM::Asm asm_ {};
 
-	TucanScript::Binary::BinaryBuilder::Decompose (args[1], asm_, roData);
+	Binary::BinaryBuilder::Decompose (args[1], asm_, roData);
 
-	auto staticDealloc = new TucanScript::VM::UnsafeDeallocator ();
-	staticDealloc->PutReadOnlyData (roData);
+	auto pStaticDealloc = new VM::UnsafeDeallocator ();
+	pStaticDealloc->PutReadOnlyData (roData);
 
 	Size stackSize = StackSize;
 	if (nArgs > nArg_StackSize && !TryParse (args[nArg_StackSize], stackSize)) {
@@ -44,22 +44,22 @@ ProgramExitCode_t main (SInt32 nArgs, Sym* args[]) {
 		LogErr ("Invalid call depth limit format");
 	}
 
-	vm = new TucanScript::VM::VirtualMachine (
+	pVM = new VM::VirtualMachine (
 		stackSize,
 		fixedMemorySize,
 		callDepthLimit,
 		asm_,
-		staticDealloc);
+		pStaticDealloc);
 
 	atexit (FreeVM);
 
-    if (!vm) {
+    if (!pVM) {
         LogErr ("Virtual machine is already killed!");
         return _Fail;
     }
 
-    vm->Run();
-    delete vm;
+    pVM->Run();
+    delete pVM;
 
 	return Zero;
 }

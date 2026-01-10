@@ -5,20 +5,24 @@
 #include <GLFW/glfw3.h>
 
 #include "../../Utility.h"
+#include "../../VirtualMachine.h"
 
 using namespace TucanScript;
-
-#ifndef NUM_PIPELINES
-#define NUM_PIPELINES 2u
-#endif
-
-#ifndef MAX_FRAMES_IN_FLIGHT
-#define MAX_FRAMES_IN_FLIGHT 2u
-#endif
 
 typedef uint32_t Width_t;
 typedef uint32_t Height_t;
 typedef const Sym* RCStr;
+
+enum class VkPipelineFlags : DWord {
+	None		= 0,
+	DepthTest	= 1u << 0,
+	Blend		= 1u << 1,
+};
+
+inline Boolean VkHasFlag(const VkPipelineFlags uValue, const VkPipelineFlags uFlag)
+{
+	return (static_cast<DWord>(uValue) & static_cast<DWord>(uFlag)) != Zero;
+}
 
 struct VkAppDeviceView {
 	VkPhysicalDevice hPhysicalDevice;
@@ -77,10 +81,7 @@ struct VkImageBundle {
 	VkImageView m_hImageView;
 };
 
-struct VkVertex {
-	Dec32 m_Position[3];
-	Dec32 m_UV[2];
-};
+
 
 struct VkRuntimeInfo {
 	DWord m_Frame { 0u };
@@ -113,17 +114,17 @@ struct VkApplication {
 	VkImageBundle m_ColorImageBundle;
 	VkCommandPool m_hCmdPool;
 	Vector<VkCommandBuffer> m_CmdBuffers;
-	VkPipelineView m_PipelineViews[NUM_PIPELINES];
+	Vector<VkPipelineView> m_PipelineViews;
 	VkExtent2D m_Extent;
 	Vector<VkFramebuffer> m_FrameBuffers;
 	VkSyncPrimitives m_SyncPrimitives;
-	DWord m_nImages;
+	DWord m_nImages, m_nMaxFramesInFlight;
 	VkRenderPass m_hRenderPass;
 	VkSampleCountFlagBits m_uSampleCount;
 	VkRuntimeInfo m_RtInfo;
 };
 
-Undef VkMakeApp (VkApplication** hAppPtr, RCStr sAppTitle, const Width_t iW, const Height_t iH);
+Undef VkMakeApp (VkApplication** hAppPtr, RCStr sAppTitle, Width_t iW, Height_t iH, DWord nMaxFramesInFlight);
 Undef VkCreateSwapchain (VkApplication* hApp);
 Undef VkGetSwapchainImages (VkApplication* hApp);
 DWord VkFindMemoryType (VkApplication* hApp, DWord uTypeFilter, VkMemoryPropertyFlags uMemPropFlags);
@@ -133,7 +134,10 @@ Undef VkCreateShaderModules(VkApplication* hApp,
 									ShaderCode pFragmentShaderSrc, Size uFragmentShaderSize,
 									RCStr sEntryPt,
 									DWord uPipelineIndex);
-Undef VkCreatePipeline(VkApplication* hApp, DWord uPipelineIndex, const VkPipelineDepthStencilStateCreateInfo& depthStencilCreateInfo);
+DWord VkCreatePipeline(VkApplication* hApp,
+                       const VkVertexInputBindingDescription *pBindings, DWord nBindings,
+                       const VkVertexInputAttributeDescription *pAttribs, DWord nAttribs, const VkPipelineDepthStencilStateCreateInfo& depthStencilCreateInfo, VkPipelineFlags uFlags, VkPolygonMode iPolygonMode, VkCullModeFlags uCullMode, VkPrimitiveTopology
+                       iTopology);
 Undef VkCreateDescriptorPool (VkApplication* hApp, DWord uPipelineIndex, VkDescriptorPoolSize* aPoolSizes, DWord nPoolSizes);
 Undef VkCreateDescriptorSetLayout (VkApplication* hApp, 
 										  DWord uPipelineIndex,
@@ -210,7 +214,7 @@ Undef VkCpyBuffer (
 Undef VkGenVertexBuffer (VkApplication* hApp, 
 								VkBuffer* hBuffRef,
 								VkDeviceMemory* hBuffMemoryRef,
-								VkVertex* aVertices, Size nVertices);
+								const Undef* pVertBuffData, Size uVertBuffSize);
 Undef VkGenIndexBuffer (VkApplication* hApp,
 							   VkBuffer* hBuffRef,
 							   VkDeviceMemory* hBuffMemoryRef,
@@ -224,4 +228,30 @@ Undef VkFillUniformBuffer (VkApplication* hApp,
 								  VkDeviceSize uUBOSize);
 Undef VkEnableDepthTest (VkPipelineDepthStencilStateCreateInfo* pDepthStencilStateCreateInfo);
 Undef VkDisableDepthTest (VkPipelineDepthStencilStateCreateInfo* pDepthStencilStateCreateInfo);
+
+extern VkApplication* hVkContext;
+
+ExternC {
+	TucanAPI Undef VkCreateContext(ExC_Args);
+	TucanAPI Undef VkLayoutBinding(ExC_Args);
+	TucanAPI Undef VkBuildLayout(ExC_Args);
+	TucanAPI Undef VkLoadSpvAssembly(ExC_Args);
+	TucanAPI Undef VkBuildShaderModules(ExC_Args);
+	TucanAPI Undef VkVertexInputBinding(ExC_Args);
+	TucanAPI Undef VkVertexInputAttribute(ExC_Args);
+	TucanAPI Undef VkBuildPipeline(ExC_Args);
+	TucanAPI Undef VkBuildAttachments(ExC_Args);
+	TucanAPI Undef VkGetMipmapCnt(ExC_Args);
+	TucanAPI Undef VkTexImage2D(ExC_Args);
+	TucanAPI Undef VkTexSampler2D(ExC_Args);
+	TucanAPI Undef VkAllocUniformBuffers(ExC_Args);
+	TucanAPI Undef VkBuildDescriptorPool(ExC_Args);
+	TucanAPI Undef VkUniformDescriptorSet(ExC_Args);
+	TucanAPI Undef VkTexImageDescriptorSet(ExC_Args);
+	TucanAPI Undef VkBuildDescriptorSets(ExC_Args);
+	TucanAPI Undef VkGenCmdBuffers(ExC_Args);
+	TucanAPI Undef VkGenVertexBuffer(ExC_Args);
+	TucanAPI Undef VkGenIndexBuffer(ExC_Args);
+}
+
 #endif

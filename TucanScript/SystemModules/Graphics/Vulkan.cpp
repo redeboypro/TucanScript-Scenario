@@ -6,15 +6,14 @@ using namespace TucanScript;
 #define GLFW_INCLUDE_VULKAN
 #endif
 
+VkApplication* hVkContext { nullptr };
+
 Undef VkMakeApp (
 	VkApplication** hAppPtr, 
 	RCStr sAppTitle, 
-	const Width_t iW, const Height_t iH) {
-	VkApplication* hApp = new VkApplication ();
-	if (!hApp) {
-		LogErr ("Failed to create application!");
-		return;
-	}
+	const Width_t iW, const Height_t iH,
+	DWord nMaxFramesInFlight) {
+	auto* hApp = new VkApplication ();
 	*hAppPtr = hApp;
 
 	glfwInit ();
@@ -22,6 +21,11 @@ Undef VkMakeApp (
 	glfwWindowHint (GLFW_RESIZABLE, GLFW_FALSE);
 	glfwWindowHint (GLFW_CLIENT_API, GLFW_NO_API);
 
+#if defined(__APPLE__)
+    glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
+#endif
+
+	hApp->m_nMaxFramesInFlight = nMaxFramesInFlight;
 	hApp->m_hWindow = glfwCreateWindow (iW, iH, sAppTitle, nullptr, nullptr);
 	if (!hApp->m_hWindow) {
 		glfwTerminate ();
@@ -43,7 +47,7 @@ Undef VkMakeApp (
 		.apiVersion = VK_API_VERSION_1_4
 	};
 
-	const Vector<RCStr> validationLayers = {
+	const Vector<const Sym*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation"
 	};
 
@@ -272,6 +276,7 @@ DWord VkFindMemoryType (VkApplication* hApp, DWord uTypeFilter, VkMemoryProperty
 		}
 	}
 	LogErr ("Failed to find suitable memory type!");
+	return -1u;
 }
 
 Undef VkCreateRenderPass (VkApplication* hApp) {
@@ -399,40 +404,30 @@ Undef VkCreateShaderModules (VkApplication* hApp, ShaderCode pVertexShaderSrc, S
 	};
 }
 
-Undef VkCreatePipeline (VkApplication* hApp, DWord uPipelineIndex,
-						const VkPipelineDepthStencilStateCreateInfo& depthStencilCreateInfo) {
-	VkVertexInputBindingDescription bindingDescription {
-		.binding = 0u,
-		.stride = sizeof (VkVertex),
-		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
-	};
+DWord VkCreatePipeline (VkApplication* hApp,
+                        const VkVertexInputBindingDescription *pBindings, const DWord nBindings,
+                        const VkVertexInputAttributeDescription *pAttribs, const DWord nAttribs,
+                        const VkPipelineDepthStencilStateCreateInfo& depthStencilCreateInfo,
+                        VkPipelineFlags uFlags,
+                        VkPolygonMode iPolygonMode,
+                        VkCullModeFlags uCullMode,
+                        VkPrimitiveTopology iTopology) {
+	DWord uPipelineIndex = hApp->m_PipelineViews.size();
+	hApp->m_PipelineViews.push_back({});
 
-	VkVertexInputAttributeDescription aAttributeDescriptions[2u] = {
-		{
-			.location = 0u,
-			.binding = 0u,
-			.format = VK_FORMAT_R32G32B32_SFLOAT,
-			.offset = offsetof (VkVertex, m_Position)
-		},
-		{
-			.location = 1u,
-			.binding = 0u,
-			.format = VK_FORMAT_R32G32_SFLOAT,
-			.offset = offsetof (VkVertex, m_UV)
-		}
-	};
+	auto& pipeline = hApp->m_PipelineViews[uPipelineIndex];
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-		.vertexBindingDescriptionCount = 1u,
-		.pVertexBindingDescriptions = &bindingDescription,
-		.vertexAttributeDescriptionCount = 2u,
-		.pVertexAttributeDescriptions = aAttributeDescriptions
+		.vertexBindingDescriptionCount = nBindings,
+		.pVertexBindingDescriptions = pBindings,
+		.vertexAttributeDescriptionCount = nAttribs,
+		.pVertexAttributeDescriptions = pAttribs
 	};
 
 	VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyCreateInfo {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.topology = iTopology,
 		.primitiveRestartEnable = VK_FALSE
 	};
 
@@ -446,14 +441,17 @@ Undef VkCreatePipeline (VkApplication* hApp, DWord uPipelineIndex,
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 		.depthClampEnable = VK_FALSE,
 		.rasterizerDiscardEnable = VK_FALSE,
-		.polygonMode = VK_POLYGON_MODE_FILL,
-		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.polygonMode = iPolygonMode,
+		.cullMode = uCullMode,
 		.frontFace = VK_FRONT_FACE_CLOCKWISE,
 		.depthBiasEnable = VK_FALSE,
 		.lineWidth = 1.0f
 	};
 
-	VkPipelineColorBlendAttachmentState colorBlendAttachment {
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = VkHasFlag(uFlags, VkPipelineFlags::Blend) ?
+
+	//Blending enabled
+	VkPipelineColorBlendAttachmentState {
 		.blendEnable = VK_TRUE,
 		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
 		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
@@ -465,6 +463,11 @@ Undef VkCreatePipeline (VkApplication* hApp, DWord uPipelineIndex,
 						  VK_COLOR_COMPONENT_G_BIT |
 						  VK_COLOR_COMPONENT_B_BIT |
 						  VK_COLOR_COMPONENT_A_BIT,
+	} :
+
+	//Blending disabled
+	VkPipelineColorBlendAttachmentState {
+		.blendEnable = VK_FALSE
 	};
 
 	VkPipelineColorBlendStateCreateInfo colorBlending {
@@ -494,16 +497,16 @@ Undef VkCreatePipeline (VkApplication* hApp, DWord uPipelineIndex,
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
 		.setLayoutCount = 1u,
-		.pSetLayouts = &hApp->m_PipelineViews[uPipelineIndex].m_DescriptorSetLayout
+		.pSetLayouts = &pipeline.m_DescriptorSetLayout
 	};
 
-	auto hPipelineLayout = &hApp->m_PipelineViews[uPipelineIndex].m_hPipelineLayout;
+	auto hPipelineLayout = &pipeline.m_hPipelineLayout;
 	vkCreatePipelineLayout (hApp->m_DeviceView.hLogicalDevice, &pipelineLayoutInfo, nullptr, hPipelineLayout);
 
 	VkGraphicsPipelineCreateInfo graphicsPipelineCreateInfo {
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
 		.stageCount = 2u,
-		.pStages = hApp->m_PipelineViews[uPipelineIndex].m_ShaderView.m_aShaderStages,
+		.pStages = pipeline.m_ShaderView.m_aShaderStages,
 		.pVertexInputState = &vertexInputInfo,
 		.pInputAssemblyState = &pipelineInputAssemblyCreateInfo,
 		.pViewportState = &pipelineViewportStateCreateInfo,
@@ -524,22 +527,24 @@ Undef VkCreatePipeline (VkApplication* hApp, DWord uPipelineIndex,
 		1u, 
 		&graphicsPipelineCreateInfo, 
 		nullptr, 
-		&hApp->m_PipelineViews[uPipelineIndex].m_hPipeline) != VK_SUCCESS) {
+		&pipeline.m_hPipeline) != VK_SUCCESS) {
 		LogErr ("Failed to create pipeline!");
 	}
 
 	vkDestroyShaderModule (hApp->m_DeviceView.hLogicalDevice, 
-						   hApp->m_PipelineViews[uPipelineIndex].m_ShaderView.m_hVertexShaderModule,
+						   pipeline.m_ShaderView.m_hVertexShaderModule,
 						   nullptr);
 	vkDestroyShaderModule (hApp->m_DeviceView.hLogicalDevice, 
-						   hApp->m_PipelineViews[uPipelineIndex].m_ShaderView.m_hFragmentShaderModule,
+						   pipeline.m_ShaderView.m_hFragmentShaderModule,
 						   nullptr);
+
+	return uPipelineIndex;
 }
 
 Undef VkCreateDescriptorPool (VkApplication* hApp, DWord uPipelineIndex, VkDescriptorPoolSize* aPoolSizes, DWord nPoolSizes) {
 	VkDescriptorPoolCreateInfo poolInfo {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-		.maxSets = MAX_FRAMES_IN_FLIGHT,
+		.maxSets = hApp->m_nMaxFramesInFlight,
 		.poolSizeCount = nPoolSizes,
 		.pPoolSizes = aPoolSizes
 	};
@@ -565,20 +570,20 @@ Undef VkCreateDescriptorSetLayout (VkApplication* hApp, DWord uPipelineIndex, Vk
 
 Undef VkCreateDescriptorSets (VkApplication* hApp, DWord uPipelineIndex, VkWriteDescriptorSet* aDescriptorSets, DWord nDescriptorSets) {
 	auto& pipeline = hApp->m_PipelineViews[uPipelineIndex];
-	Vector<VkDescriptorSetLayout> layouts (MAX_FRAMES_IN_FLIGHT, pipeline.m_DescriptorSetLayout);
+	Vector<VkDescriptorSetLayout> layouts (hApp->m_nMaxFramesInFlight, pipeline.m_DescriptorSetLayout);
 	VkDescriptorSetAllocateInfo allocInfo {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 		.descriptorPool = pipeline.m_DescriptorPool,
-		.descriptorSetCount = static_cast<DWord>(MAX_FRAMES_IN_FLIGHT),
+		.descriptorSetCount = static_cast<DWord>(hApp->m_nMaxFramesInFlight),
 		.pSetLayouts = layouts.data ()
 	};
-	pipeline.m_DescriptorSets.resize (MAX_FRAMES_IN_FLIGHT);
+	pipeline.m_DescriptorSets.resize (hApp->m_nMaxFramesInFlight);
 	if (vkAllocateDescriptorSets (hApp->m_DeviceView.hLogicalDevice, &allocInfo, pipeline.m_DescriptorSets.data ()) != VK_SUCCESS) {
 		LogErr ("Failed to allocate descriptor sets!");
 		return;
 	}
 	Vector<VkDescriptorBufferInfo*> enumBuffInfos;
-	for (DWord uImage = 0u; uImage < MAX_FRAMES_IN_FLIGHT; uImage++) {
+	for (DWord uImage = 0u; uImage < hApp->m_nMaxFramesInFlight; uImage++) {
 		Vector<VkWriteDescriptorSet> localDescriptorSets;
 		Vector<VkDescriptorBufferInfo> localBufferInfos;
 
@@ -681,12 +686,12 @@ Undef VkGenCmdPool (VkApplication* hApp) {
 }
 
 Undef VkGenCmdBuffers (VkApplication* hApp) {
-	hApp->m_CmdBuffers = Vector<VkCommandBuffer> (MAX_FRAMES_IN_FLIGHT);
+	hApp->m_CmdBuffers = Vector<VkCommandBuffer> (hApp->m_nMaxFramesInFlight);
 	VkCommandBufferAllocateInfo cmdBufferAllocateInfo {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.commandPool = hApp->m_hCmdPool,
 		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = static_cast<DWord>(MAX_FRAMES_IN_FLIGHT)
+		.commandBufferCount = hApp->m_nMaxFramesInFlight
 	};
 	vkAllocateCommandBuffers (
 		hApp->m_DeviceView.hLogicalDevice, 
@@ -704,7 +709,7 @@ Undef VkGenSyncPrimitives (VkApplication* hApp) {
 		.flags = VK_FENCE_CREATE_SIGNALED_BIT
 	};
 
-	for (Size iImage = 0u; iImage < MAX_FRAMES_IN_FLIGHT; ++iImage) {
+	for (Size iImage = 0u; iImage < hApp->m_nMaxFramesInFlight; ++iImage) {
 		VkSemaphore hSemaphore;
 		VkFence hFence;
 		vkCreateSemaphore (hApp->m_DeviceView.hLogicalDevice, &semaphoreInfo, nullptr, &hSemaphore);
@@ -792,7 +797,7 @@ Undef VkEnd (VkApplication* hApp) {
 	};
 	vkQueuePresentKHR (hApp->m_PresentQueueView.m_hQueue, &presentInfo);
 
-	rtInfo.m_Frame = (rtInfo.m_Frame + 1u) % MAX_FRAMES_IN_FLIGHT;
+	rtInfo.m_Frame = (rtInfo.m_Frame + 1u) % hApp->m_nMaxFramesInFlight;
 }
 
 Undef VkMakeViewport (VkApplication* hApp, 
@@ -811,7 +816,7 @@ Undef VkScissor (VkApplication* hApp,
 				 DWord uX, DWord uY,
 				 Width_t uW, Height_t uH) {
 	VkRect2D scissor { 
-		{uX, uY},
+		{(SInt32) uX, (SInt32) uY},
 		{uW, uH}
 	};
 	vkCmdSetScissor (hApp->m_RtInfo.m_CmdBuffer, 0u, 1u, &scissor);
@@ -823,7 +828,7 @@ Undef VkBindPipeline (VkApplication* hApp, DWord uPipelineIndex) {
 }
 
 VkFormat VkGetSupportedFormat (VkApplication* hApp, const Vector<VkFormat>& enumCandidates, VkImageTiling uImgTiling, VkFormatFeatureFlags uFormatFeatureFlags) {
-	for (VkFormat format : enumCandidates) {
+	for (const VkFormat format : enumCandidates) {
 		VkFormatProperties props;
 		vkGetPhysicalDeviceFormatProperties (hApp->m_DeviceView.hPhysicalDevice, format, &props);
 
@@ -831,12 +836,14 @@ VkFormat VkGetSupportedFormat (VkApplication* hApp, const Vector<VkFormat>& enum
 			(props.linearTilingFeatures & uFormatFeatureFlags) == uFormatFeatureFlags) {
 			return format;
 		}
-		else if (uImgTiling == VK_IMAGE_TILING_OPTIMAL && 
-				 (props.optimalTilingFeatures & uFormatFeatureFlags) == uFormatFeatureFlags) {
+
+		if (uImgTiling == VK_IMAGE_TILING_OPTIMAL &&
+		    (props.optimalTilingFeatures & uFormatFeatureFlags) == uFormatFeatureFlags) {
 			return format;
 		}
 	}
 	LogErr ("Failed to find supported format!");
+	return VK_FORMAT_UNDEFINED;
 }
 
 VkFormat VkGetDepthFormat (VkApplication* hApp) {
@@ -1214,7 +1221,7 @@ Undef VkTexImageView (VkApplication* hApp, VkTexture* hTexture, VkFormat uFormat
 }
 
 Undef VkTexImage (VkApplication* hApp, VkTexture* hTexture, UInt8* pData, Width_t uW, Height_t uH, DWord nChannels, DWord nMipLevels, VkFormat uFormat) {
-	VkDeviceSize uImageSize = static_cast<VkDeviceSize>(uW * uH * nChannels);
+	VkDeviceSize uImageSize = uW * uH * nChannels;
 
 	VkBuffer pStagingBuffer;
 	VkDeviceMemory pStagingBufferMemory;
@@ -1323,28 +1330,26 @@ Undef VkCpyBuffer (VkApplication* hApp, VkBuffer hSrcBuff, VkBuffer hDstBuff, Vk
 	VkCmdEnd (hApp, hCmdBuff);
 }
 
-Undef VkGenVertexBuffer (VkApplication* hApp, VkBuffer* hBuffRef, VkDeviceMemory* hBuffMemoryRef, VkVertex* aVertices, Size nVertices) {
-	VkDeviceSize uBuffSize = sizeof (VkVertex) * nVertices;
-
+Undef VkGenVertexBuffer (VkApplication* hApp, VkBuffer* hBuffRef, VkDeviceMemory* hBuffMemoryRef, const Undef* pVertBuffData, const Size uVertBuffSize) {
 	VkBuffer hStagingBuff;
 	VkDeviceMemory hStagingBuffMemory;
-	VkGenBuffer (hApp, uBuffSize,
+	VkGenBuffer (hApp, uVertBuffSize,
 				 VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 				 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 				 &hStagingBuff, &hStagingBuffMemory);
 
 	Undef* hData;
-	vkMapMemory (hApp->m_DeviceView.hLogicalDevice, hStagingBuffMemory, 0u, uBuffSize, 0u, &hData);
-	std::memcpy (hData, aVertices, uBuffSize);
+	vkMapMemory (hApp->m_DeviceView.hLogicalDevice, hStagingBuffMemory, 0u, uVertBuffSize, 0u, &hData);
+	std::memcpy (hData, pVertBuffData, uVertBuffSize);
 	vkUnmapMemory (hApp->m_DeviceView.hLogicalDevice, hStagingBuffMemory);
 
 	VkGenBuffer (hApp,
-				 uBuffSize,
+				 uVertBuffSize,
 				 VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
 				 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 				 hBuffRef, hBuffMemoryRef);
 
-	VkCpyBuffer (hApp, hStagingBuff, *hBuffRef, uBuffSize);
+	VkCpyBuffer (hApp, hStagingBuff, *hBuffRef, uVertBuffSize);
 
 	vkDestroyBuffer (hApp->m_DeviceView.hLogicalDevice, hStagingBuff, nullptr);
 	vkFreeMemory (hApp->m_DeviceView.hLogicalDevice, hStagingBuffMemory, nullptr);
@@ -1378,17 +1383,17 @@ Undef VkGenIndexBuffer (VkApplication* hApp, VkBuffer* hBuffRef, VkDeviceMemory*
 	vkFreeMemory (hApp->m_DeviceView.hLogicalDevice, hStagingBuffMemory, nullptr);
 }
 
-Undef VkGenUniformBuffers (VkApplication* hApp, DWord uPipelineIndex, VkDeviceSize uUBOSize) {
+Undef VkGenUniformBuffers (VkApplication* hApp, DWord uPipelineIndex, VkDeviceSize uBuffSize) {
 	auto& pipeline = hApp->m_PipelineViews[uPipelineIndex];
 
-	pipeline.m_UniformBindingSet.m_Buffers.resize(MAX_FRAMES_IN_FLIGHT);
-	pipeline.m_UniformBindingSet.m_Memories.resize (MAX_FRAMES_IN_FLIGHT);
-	pipeline.m_UniformBindingSet.m_Mapped.resize (MAX_FRAMES_IN_FLIGHT);
+	pipeline.m_UniformBindingSet.m_Buffers.resize(hApp->m_nMaxFramesInFlight);
+	pipeline.m_UniformBindingSet.m_Memories.resize (hApp->m_nMaxFramesInFlight);
+	pipeline.m_UniformBindingSet.m_Mapped.resize (hApp->m_nMaxFramesInFlight);
 
-	for (Size uBuffer = 0u; uBuffer < MAX_FRAMES_IN_FLIGHT; uBuffer++) {
+	for (Size uBuffer = 0u; uBuffer < hApp->m_nMaxFramesInFlight; uBuffer++) {
 		VkGenBuffer (
 			hApp,
-			uUBOSize,
+			uBuffSize,
 			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&pipeline.m_UniformBindingSet.m_Buffers[uBuffer],
@@ -1398,15 +1403,15 @@ Undef VkGenUniformBuffers (VkApplication* hApp, DWord uPipelineIndex, VkDeviceSi
 			hApp->m_DeviceView.hLogicalDevice,
 			pipeline.m_UniformBindingSet.m_Memories[uBuffer],
 			0u,
-			uUBOSize,
+			uBuffSize,
 			0u,
 			&pipeline.m_UniformBindingSet.m_Mapped[uBuffer]);
 	}
 }
 
-Undef VkFillUniformBuffer (VkApplication* hApp, DWord uPipelineIndex, Undef* hData, VkDeviceSize uUBOSize) {
+Undef VkFillUniformBuffer (VkApplication* hApp, DWord uPipelineIndex, Undef* hData, VkDeviceSize uBuffSize) {
 	auto& pipeline = hApp->m_PipelineViews[uPipelineIndex];
-	std::memcpy (pipeline.m_UniformBindingSet.m_Mapped[hApp->m_RtInfo.m_Frame], hData, uUBOSize);
+	std::memcpy (pipeline.m_UniformBindingSet.m_Mapped[hApp->m_RtInfo.m_Frame], hData, uBuffSize);
 }
 
 Undef VkEnableDepthTest (VkPipelineDepthStencilStateCreateInfo* pDepthStencilStateCreateInfo) {
@@ -1437,4 +1442,301 @@ Undef VkDisableDepthTest (VkPipelineDepthStencilStateCreateInfo* pDepthStencilSt
 		.minDepthBounds = 0.0f,
 		.maxDepthBounds = 1.0f
 	};
+}
+
+ExternC {
+	TucanAPI Undef VkCreateContext(ExC_Args) {
+		const auto pTitle = ExC_StringArg(0);
+		const auto iW = ExC_Int32Arg(1);
+		const auto iH = ExC_Int32Arg(2);
+
+		auto nFramesInFlight = 2;
+		if (args->m_Size > 3) {
+			nFramesInFlight = ExC_DWordArg(3);
+		}
+
+		VkMakeApp (&hVkContext, pTitle, iW, iH, nFramesInFlight);
+		VkCreateSwapchain (hVkContext);
+		VkGetSwapchainImages (hVkContext);
+		VkCreateRenderPass (hVkContext);
+
+		stack->Push<Undef*, VM::NATIVEPTR_T> (hVkContext, &VM::Word::m_NativePtr);
+	}
+
+	Undef VkLayoutBinding(ExC_Args) {
+		auto* pLayoutBinding = new VkDescriptorSetLayoutBinding {
+			.binding = ExC_DWordArg(0),
+			.descriptorType = static_cast<VkDescriptorType>(ExC_Int32Arg(1)),
+			.descriptorCount = 1u,
+			.stageFlags = ExC_DWordArg(2),
+			.pImmutableSamplers = nullptr
+		};
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+			vm->GetAllocator()->Alloc(pLayoutBinding,
+			sizeof(VkDescriptorSetLayoutBinding)),
+			&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkBuildLayout(ExC_Args) {
+		const DWord uPipelineIndex = ExC_DWordArg(0);
+		const auto* hBindingsArr = ExC_ManagedArg(1);
+
+		auto* pLayoutBindings = new VkDescriptorSetLayoutBinding[hBindingsArr->m_Size];
+		for (QWord i = 0; i < hBindingsArr->m_Size; i++) {
+			pLayoutBindings[i] = *static_cast<VkDescriptorSetLayoutBinding*>(
+				hBindingsArr->m_Memory.m_hSpecBuf[i]
+				.m_Data.m_ManagedPtr->m_Memory.
+				m_hRawBuf);
+		}
+
+		VkCreateDescriptorSetLayout (hVkContext, uPipelineIndex, pLayoutBindings, hBindingsArr->m_Size);
+		delete[] pLayoutBindings;
+	}
+
+	TucanAPI Undef VkLoadSpvAssembly(ExC_Args) {
+		IFileStream file (ExC_StringArg(0), std::ios::ate | std::ios::binary);
+
+		if (!file.is_open ()) {
+			throw std::runtime_error ("Failed to open spir-v binary stream!");
+		}
+
+		const std::streamsize szAsm = file.tellg();
+		const auto pRawAllocatedMemory = std::malloc (szAsm);
+		const auto pAsm = static_cast<ShaderCode>(pRawAllocatedMemory);
+
+		file.seekg (Zero);
+		file.read (reinterpret_cast<Sym*> (pAsm), szAsm);
+
+		file.close ();
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+		vm->GetAllocator()->Alloc(pRawAllocatedMemory, szAsm),
+		&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkBuildShaderModules(ExC_Args) {
+		const auto pVertShaderAsm = ExC_ManagedArg(0);
+		const auto pFragShaderAsm = ExC_ManagedArg(1);
+		const auto sEntryPt = ExC_StringArg(2);
+		const auto uPipelineIndex = ExC_DWordArg(3);
+		VkCreateShaderModules (hVkContext,
+						   static_cast<ShaderCode>(pVertShaderAsm->m_Memory.m_hRawBuf), pVertShaderAsm->m_Size,
+						   static_cast<ShaderCode>(pFragShaderAsm->m_Memory.m_hRawBuf), pFragShaderAsm->m_Size,
+						   sEntryPt, uPipelineIndex);
+	}
+
+	TucanAPI Undef VkVertexInputBinding(ExC_Args) {
+		constexpr Size szBinding = sizeof(VkVertexInputBindingDescription);
+
+		auto pBindingRawMemory = std::malloc(szBinding);
+
+		auto pBinding = static_cast<VkVertexInputBindingDescription*>(pBindingRawMemory);
+		{
+			pBinding->binding = ExC_DWordArg(0);
+			pBinding->stride = ExC_DWordArg(1);
+			pBinding->inputRate = static_cast<VkVertexInputRate>(ExC_Int32Arg(2));
+		}
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+		vm->GetAllocator()->Alloc(pBindingRawMemory, szBinding),
+		&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkVertexInputAttribute(ExC_Args) {
+		constexpr Size szAttrib = sizeof(VkVertexInputAttributeDescription);
+
+		auto pAttribRawMemory = std::malloc (szAttrib);
+
+		auto pAttrib = static_cast<VkVertexInputAttributeDescription*>(pAttribRawMemory);
+		{
+			pAttrib->binding = ExC_DWordArg(0);
+			pAttrib->format = static_cast<VkFormat>(ExC_Int32Arg(1));
+			pAttrib->location = ExC_DWordArg(2);
+			pAttrib->offset = ExC_DWordArg(3);
+		}
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+		vm->GetAllocator()->Alloc(pAttribRawMemory, szAttrib),
+		&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkBuildPipeline(ExC_Args) {
+
+		const auto hBindingArr = ExC_ManagedArg(0);
+		const auto hAttribArr = ExC_ManagedArg(1);
+
+		const auto iPolygonMode = static_cast<VkPolygonMode>(ExC_Int32Arg(2));
+		const VkCullModeFlags uCullMode = ExC_DWordArg(3);
+		const auto iTopology = static_cast<VkPrimitiveTopology>(ExC_Int32Arg(4));
+
+		VkPipelineDepthStencilStateCreateInfo pipelineDepthInfo;
+		const auto uFlags = args->m_Size >= 6 ? static_cast<VkPipelineFlags>(ExC_DWordArg(5)) : VkPipelineFlags::None;
+		if (VkHasFlag(uFlags, VkPipelineFlags::DepthTest)) {
+			VkEnableDepthTest (&pipelineDepthInfo);
+		}
+		else {
+			VkDisableDepthTest (&pipelineDepthInfo);
+		}
+
+		const auto pBindingBuffer = VM::CBufferUtility::GetCBuffer<VkVertexInputBindingDescription>(hBindingArr);
+		const auto pAttribBuffer = VM::CBufferUtility::GetCBuffer<VkVertexInputAttributeDescription>(hAttribArr);
+
+		const DWord uPipelineIndex = VkCreatePipeline(
+			hVkContext,
+			pBindingBuffer,
+			hBindingArr->m_Size,
+			pAttribBuffer,
+			hAttribArr->m_Size,
+			pipelineDepthInfo,
+			uFlags,
+			iPolygonMode,
+			uCullMode,
+			iTopology);
+
+		std::free (pBindingBuffer);
+		std::free (pAttribBuffer);
+
+		ExC_Return(uPipelineIndex);
+	}
+
+	TucanAPI Undef VkBuildAttachments(ExC_Args) {
+		VkGenCmdPool (hVkContext);
+		VkGenColorImageBundle (hVkContext);
+		VkGenDepthImageBundle (hVkContext);
+		VkGenFrameBuffers (hVkContext);
+	}
+
+	TucanAPI Undef VkGetMipmapCnt(ExC_Args) {
+		ExC_Return(static_cast<DWord>(std::floor(std::log2(Max (ExC_DWordArg(0), ExC_DWordArg(1))))) + 1u);
+	}
+
+	TucanAPI Undef VkTexImage2D(ExC_Args) {
+		const auto pBuffer = ExC_ManagedArg(0)->m_Memory.m_hRawBuf;
+
+		const auto hTex = new VkTexture();
+
+		const auto iFormat = static_cast<VkFormat>(ExC_Int32Arg(4));
+		const auto uMipLevels = ExC_DWordArg(5);
+
+		VkTexImage(hVkContext, hTex, static_cast<UInt8*>(pBuffer),
+			ExC_DWordArg(1), ExC_DWordArg(2),
+			ExC_DWordArg(3),
+			uMipLevels, iFormat);
+		VkTexImageView(hVkContext, hTex, iFormat, uMipLevels);
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+		vm->GetAllocator()->Alloc(hTex, sizeof(VkTexture)),
+		&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkTexSampler2D(ExC_Args) {
+		const auto hTex = static_cast<VkTexture*>(ExC_ManagedArg(0)->m_Memory.m_hRawBuf);
+		VkTexSampler(hVkContext, hTex,
+			static_cast<VkFilter>(ExC_Int32Arg(1)), static_cast<VkFilter>(ExC_Int32Arg(2)),
+			static_cast<VkSamplerAddressMode>(ExC_Int32Arg(3)),
+			static_cast<VkSamplerAddressMode>(ExC_Int32Arg(4)),
+			static_cast<VkSamplerAddressMode>(ExC_Int32Arg(5)),
+			ExC_DWordArg(6));
+	}
+
+	TucanAPI Undef VkAllocUniformBuffers(ExC_Args) {
+		VkGenUniformBuffers(hVkContext, ExC_DWordArg(0), ExC_QWordArg(1));
+	}
+
+	TucanAPI Undef VkBuildDescriptorPool(ExC_Args) {
+		if (!hVkContext) {
+			LogErr("Vulkan context is destroyed!");
+			return;
+		}
+
+		const auto hPoolSizesArr = ExC_ManagedArg(1);
+		const auto pDescrTypes = VM::CBufferUtility::GetCBuffer<SInt32>(hPoolSizesArr, &VM::Word::m_I32);
+		const auto pPoolSizes = new VkDescriptorPoolSize[hPoolSizesArr->m_Size];
+		for (auto iSz = 0; iSz < hPoolSizesArr->m_Size; ++iSz) {
+			pPoolSizes[iSz] = VkDescriptorPoolSize {
+				.type = static_cast<VkDescriptorType>(pDescrTypes[iSz]),
+				.descriptorCount = hVkContext->m_nMaxFramesInFlight
+			};
+		}
+		VkCreateDescriptorPool (hVkContext, ExC_DWordArg(0), pPoolSizes, hPoolSizesArr->m_Size);
+
+		std::free (pDescrTypes);
+		delete[] pPoolSizes;
+	}
+
+	TucanAPI Undef VkUniformDescriptorSet(ExC_Args) {
+		VkDescriptorBufferInfo uboDescriptorBufferInfo {
+			.offset = ExC_DWordArg(0),
+			.range  = ExC_DWordArg(1)
+		};
+
+		auto pUboDescriptorSet = new VkWriteDescriptorSet {};
+		VkCreateUniformDescriptorSet (
+			pUboDescriptorSet,
+			&uboDescriptorBufferInfo,
+			ExC_DWordArg(2),
+			ExC_DWordArg(3));
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+		vm->GetAllocator()->Alloc(pUboDescriptorSet, sizeof(VkWriteDescriptorSet)),
+		&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkTexImageDescriptorSet(ExC_Args) {
+		const auto hTex = static_cast<VkTexture*>(ExC_ManagedArg(0)->m_Memory.m_hRawBuf);
+
+		VkDescriptorImageInfo texDescriptorImageInfo {
+			.sampler = hTex->m_Sampler,
+			.imageView = hTex->m_ImageView,
+			.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		};
+
+		auto pImgDescriptorSet = new VkWriteDescriptorSet {};
+		VkCreateImageDescriptorSet (
+			pImgDescriptorSet,
+			&texDescriptorImageInfo,
+			ExC_DWordArg(1),
+			ExC_DWordArg(2));
+
+		stack->Push<VM::Managed*, VM::MANAGED_T> (
+		vm->GetAllocator()->Alloc(pImgDescriptorSet, sizeof(VkWriteDescriptorSet)),
+		&VM::Word::m_ManagedPtr);
+	}
+
+	TucanAPI Undef VkBuildDescriptorSets(ExC_Args) {
+		const auto hDescrSetsArr = ExC_ManagedArg(1);
+		const auto pDescrSets = VM::CBufferUtility::GetCBuffer<VkWriteDescriptorSet>(hDescrSetsArr);
+
+		VkCreateDescriptorSets (hVkContext, ExC_DWordArg(0), pDescrSets, hDescrSetsArr->m_Size);
+
+		std::free (pDescrSets);
+	}
+
+	TucanAPI Undef VkGenCmdBuffers(ExC_Args) {
+		VkGenCmdBuffers (hVkContext);
+		VkGenSyncPrimitives (hVkContext);
+	}
+
+	TucanAPI Undef VkGenVertexBuffer(ExC_Args) {
+		VkBuffer hVertexBuffer;
+		VkDeviceMemory hVertexBufferMemory;
+
+		const auto hVertArr = ExC_ManagedArg(0);
+
+		VkGenVertexBuffer (hVkContext,
+				   &hVertexBuffer, &hVertexBufferMemory,
+				   hVertArr->m_Memory.m_hRawBuf, hVertArr->m_Size);
+	}
+
+	TucanAPI Undef VkGenIndexBuffer(ExC_Args) {
+		VkBuffer hIndexBuffer;
+		VkDeviceMemory hIndexBufferMemory;
+
+		const auto hIndexArr = ExC_ManagedArg(0);
+
+		VkGenIndexBuffer (hVkContext,
+				   &hIndexBuffer, &hIndexBufferMemory,
+				   reinterpret_cast<VkIndex*>(hIndexArr->m_Memory.m_hRawBuf), hIndexArr->m_Size);
+	}
 }

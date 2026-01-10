@@ -235,34 +235,34 @@ Undef TucanScript::VM::VirtualMachine::FreeManagedMemory (Val* memory) {
 }
 
 Undef TucanScript::VM::VirtualMachine::MemCopy (VirtualStack& stack, MemCpyFrameArgs frameArgs, Val& dest, const Val& src, Boolean pushBack) {
-	auto srcUnpacked = Unpack (*frameArgs.m_hSrcFrame, src);
+	auto hSrcUnpacked = Unpack (*frameArgs.m_hSrcFrame, src);
 
-	auto* destUnpackTry = GetMemoryAtAddress (*frameArgs.m_hDestFrame, dest, nullptr);
-	auto& destUnpacked = destUnpackTry?*destUnpackTry:dest;
+	auto* hDestUnpackTry = GetMemoryAtAddress (*frameArgs.m_hDestFrame, dest, nullptr);
+	auto& hDestUnpacked = hDestUnpackTry?*hDestUnpackTry:dest;
 
-	if (destUnpacked.m_Type Is NATIVEPTR_T) {
-		std::memcpy (destUnpacked.m_Data.m_NativePtr,
-					 &srcUnpacked.m_Data, 
-					 ValUtility::SizeMap.at (srcUnpacked.m_Type));
+	if (hDestUnpacked.m_Type Is NATIVEPTR_T) {
+		std::memcpy (hDestUnpacked.m_Data.m_NativePtr,
+					 &hSrcUnpacked.m_Data,
+					 ValUtility::SizeMap.at (hSrcUnpacked.m_Type));
 		if (pushBack) {
-			stack.Push (destUnpacked);
+			stack.Push (hDestUnpacked);
 		}
 		return;
 	}
 
-	if (destUnpacked.m_Type Is MANAGED_T) {
-		m_Allocator.RemoveRef (destUnpacked.m_Data.m_ManagedPtr);
+	if (hDestUnpacked.m_Type Is MANAGED_T) {
+		m_Allocator.RemoveRef (hDestUnpacked.m_Data.m_ManagedPtr);
 	}
 
-	destUnpacked.m_Type = srcUnpacked.m_Type;
-	destUnpacked.m_Data = srcUnpacked.m_Data;
+	hDestUnpacked.m_Type = hSrcUnpacked.m_Type;
+	hDestUnpacked.m_Data = hSrcUnpacked.m_Data;
 
-	if (destUnpacked.m_Type Is MANAGED_T) {
-		destUnpacked.m_Data.m_ManagedPtr->m_RefCount++;
+	if (hDestUnpacked.m_Type Is MANAGED_T) {
+		hDestUnpacked.m_Data.m_ManagedPtr->m_RefCount++;
 	}
 
 	if (pushBack) {
-		stack.Push (destUnpacked);
+		stack.Push (hDestUnpacked);
 	}
 }
 
@@ -312,7 +312,7 @@ Undef TucanScript::VM::VirtualMachine::AllocStr (VirtualStack& stack, Sym* buffe
 		#if CHAR_MIN < Zero
 			.m_Type = CHAR_T,
 			.m_Data = Word {
-				.m_C = buffer[iSym]
+				.m_C = static_cast<SInt8> (buffer[iSym])
 			}
 		#else
 			.m_Type = BYTE_T,
@@ -332,44 +332,89 @@ Undef TucanScript::VM::VirtualMachine::AllocStr (VirtualStack& stack, Sym* buffe
 	});
 }
 
-#define ApplyOp(AVAL, BVAL, OP)                                     \
-switch ((AVAL).m_Type) {                                            \
-	case CHAR_T:                                                    \
-	stack.Push ((AVAL).m_Data.m_C OP (BVAL).m_Data.m_C);            \
-	break;                                                          \
-	case BYTE_T:                                                    \
-	stack.Push ((AVAL).m_Data.m_UC OP (BVAL).m_Data.m_UC);          \
-	break;                                                          \
-	case UINT16_T:                                                  \
-	stack.Push ((AVAL).m_Data.m_U16 OP (BVAL).m_Data.m_U16);        \
-	break;                                                          \
-	case UINT32_T:                                                  \
-	stack.Push ((AVAL).m_Data.m_U32 OP (BVAL).m_Data.m_U32);        \
-	break;                                                          \
-	case UINT64_T:                                                  \
-	stack.Push ((AVAL).m_Data.m_U64 OP (BVAL).m_Data.m_U64);        \
-	break;                                                          \
-	case INT16_T:                                                   \
-	stack.Push ((AVAL).m_Data.m_I16 OP (BVAL).m_Data.m_I16);        \
-	break;                                                          \
-	case INT32_T:                                                   \
-	stack.Push ((AVAL).m_Data.m_I32 OP (BVAL).m_Data.m_I32);        \
-	break;                                                          \
-	case INT64_T:                                                   \
-	stack.Push ((AVAL).m_Data.m_I64 OP (BVAL).m_Data.m_I64);        \
-	break;                                                          \
-	case FLOAT32_T:                                                 \
-	stack.Push ((AVAL).m_Data.m_F32 OP (BVAL).m_Data.m_F32);        \
-	break;                                                          \
-	case FLOAT64_T:                                                 \
-	stack.Push ((AVAL).m_Data.m_F64 OP (BVAL).m_Data.m_F64);        \
-	break;                                                          \
-}
+#define VM_INT_OP(X, AVAL, BVAL, OP)	\
+X(CHAR_T,   m_C,   AVAL, BVAL, OP)		\
+X(BYTE_T,   m_UC,  AVAL, BVAL, OP)		\
+X(UINT16_T, m_U16, AVAL, BVAL, OP)		\
+X(UINT32_T, m_U32, AVAL, BVAL, OP)		\
+X(UINT64_T, m_U64, AVAL, BVAL, OP)		\
+X(INT16_T,  m_I16, AVAL, BVAL, OP)		\
+X(INT32_T,  m_I32, AVAL, BVAL, OP)		\
+X(INT64_T,  m_I64, AVAL, BVAL, OP)
+
+#define VM_DEC_OP(X, AVAL, BVAL, OP)	\
+X(FLOAT32_T, m_F32, AVAL, BVAL, OP)		\
+X(FLOAT64_T, m_F64, AVAL, BVAL, OP)
+
+#define VM_BIN_CASE(TYPE, FIELD, AVAL, BVAL, OP)		\
+case TYPE:												\
+stack.Push((AVAL).m_Data.FIELD OP (BVAL).m_Data.FIELD); \
+break;
+
+#define ApplyBinaryOp(AVAL, BVAL, OP)								\
+do {																\
+	switch ((AVAL).m_Type) {										\
+		VM_INT_OP(VM_BIN_CASE, AVAL, BVAL, OP)						\
+		default:													\
+			LogErr("Invalid type for binary op");					\
+			Free ();												\
+			return _Fail;											\
+	}																\
+} while (Zero)
+
+#define ApplyOp(AVAL, BVAL, OP)										\
+do {																\
+	switch ((AVAL).m_Type) {										\
+		VM_INT_OP(VM_BIN_CASE, AVAL, BVAL, OP)						\
+		VM_DEC_OP(VM_BIN_CASE, AVAL, BVAL, OP)						\
+		default:													\
+			LogErr("Invalid type for binary op");					\
+			Free ();												\
+			return _Fail;											\
+	}																\
+} while (Zero)
+
+#define PatchedOpBlock(OP_PREFIX, OP)					\
+	OP_PREFIX##_I32: {									\
+		const auto b = PopUnpack (stack, frame);		\
+		const auto a = PopUnpack (stack, frame);		\
+		stack.Push (a.m_Data.m_I32 OP b.m_Data.m_I32);	\
+		break;											\
+	}													\
+	case OP_PREFIX##_I64: {								\
+		const auto b = PopUnpack (stack, frame);		\
+		const auto a = PopUnpack (stack, frame);		\
+		stack.Push (a.m_Data.m_I64 OP b.m_Data.m_I64);	\
+		break;											\
+	}													\
+	case OP_PREFIX##_U32: {								\
+		const auto b = PopUnpack (stack, frame);		\
+		const auto a = PopUnpack (stack, frame);		\
+		stack.Push (a.m_Data.m_U32 OP b.m_Data.m_U32);	\
+		break;											\
+	}													\
+	case OP_PREFIX##_U64: {								\
+		const auto b = PopUnpack (stack, frame);		\
+		const auto a = PopUnpack (stack, frame);		\
+		stack.Push (a.m_Data.m_U64 OP b.m_Data.m_U64);	\
+		break;											\
+	}													\
+	case OP_PREFIX##_F32: {								\
+		const auto b = PopUnpack (stack, frame);		\
+		const auto a = PopUnpack (stack, frame);		\
+		stack.Push (a.m_Data.m_F32 OP b.m_Data.m_F32);	\
+		break;											\
+	}													\
+	case OP_PREFIX##_F64: {								\
+		const auto b = PopUnpack (stack, frame);		\
+		const auto a = PopUnpack (stack, frame);		\
+		stack.Push (a.m_Data.m_F64 OP b.m_Data.m_F64);	\
+		break;											\
+	}
 
 #define InvalidStackPopVal "Invalid stack popped value type!"
-TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr, VirtualStack& stack, JmpMemory& frame) {
-	auto& instruction = m_Asm.m_Memory[qInstr];
-	switch (instruction.m_Op) {
+SInt32 VM::VirtualMachine::HandleInstr (SInt64& qInstr, VirtualStack& stack, JmpMemory& frame) {
+	switch (auto& instruction = m_Asm.m_Memory[qInstr]; instruction.m_Op) {
 		case HALT: {
 			return _Exit;
 		}
@@ -451,7 +496,7 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 				stack.Push (GetMemorySize (src));
 			}
 			else if (src.m_Type Is NATIVEPTR_T) {
-				stack.Push ((Size)std::strlen (reinterpret_cast <Sym*>(src.m_Data.m_NativePtr)));
+				stack.Push (std::strlen (reinterpret_cast <Sym*>(src.m_Data.m_NativePtr)));
 			}
 			else {
 				LogInstErr (nameof (MEMSIZE), InvalidStackPopVal);
@@ -571,17 +616,63 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			});
 			break;
 		}
+		case CBUFFERALLOC: {
+			auto uAlignment = PopUnpack (stack, frame).m_Data.m_U64;
+			auto uDataSize = PopUnpack (stack, frame).m_Data.m_U64;
+
+			auto hAddr = stack.Pop ();
+			auto nArgs = PopUnpack (stack, frame).m_Data.m_I32;
+
+			auto szBuff = uDataSize * nArgs;
+
+			auto pBuffer = static_cast<std::byte*>(
+				AllocAligned (szBuff, uAlignment)
+			);
+
+			if (!pBuffer) {
+				LogInstErr (nameof (CBUFFERALLOC), "Failed to aligned alloc!");
+				Free ();
+				return _Fail;
+			}
+
+			std::memset (pBuffer, Zero, szBuff);
+
+			Size szOffset = szBuff;
+			for (SInt32 iElement = 0; iElement < nArgs; ++iElement) {
+				auto [m_Type, m_Data] = PopUnpack(stack, frame);
+
+				auto szType = ValUtility::SizeMap.at(m_Type);
+
+				szOffset -= szType;
+
+				CpyAligned(
+					pBuffer,
+					szOffset,
+					&m_Data,
+					szType,
+					uAlignment
+				);
+			}
+
+			auto hBuffer = Val {
+				NATIVEPTR_T,
+				{
+					.m_NativePtr = pBuffer
+				}
+			};
+
+			MemCopy (stack, &frame, hAddr, hBuffer, false);
+			break;
+		}
 		case MEMAPPEND: {
 			auto newElement = PopUnpack (stack, frame);
-			auto memoryHolder = PopUnpack (stack, frame);
 
-			if (memoryHolder.m_Type Is MANAGED_T) {
-				auto* managedMemory = memoryHolder.m_Data.m_ManagedPtr;
+			if (auto [m_Type, m_Data] = PopUnpack (stack, frame); m_Type Is MANAGED_T) {
+				auto* managedMemory = m_Data.m_ManagedPtr;
 
 				const UInt64 newSize = (NextWord (managedMemory->m_Size)) * sizeof (Val);
-				auto newMemory = std::realloc (managedMemory->m_Memory.m_hSpecBuf, newSize);
 
-				if (newMemory) {
+				if (auto newMemory = std::realloc (managedMemory->m_Memory.m_hSpecBuf, newSize)) {
 					managedMemory->m_Memory.m_hSpecBuf = (Val*) newMemory;
 					managedMemory->m_Memory.m_hSpecBuf[managedMemory->m_Size++] = newElement;
 				}
@@ -600,7 +691,8 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 				FreeManagedMemory (GetMemoryAtRAddress (poppedValue.m_Data.m_I32));
 				break;
 			}
-			else if (poppedValue.m_Type Is LRADDRESS_T) {
+
+			if (poppedValue.m_Type Is LRADDRESS_T) {
 				FreeManagedMemory (GetMemoryAtLRAddress (frame, poppedValue.m_Data.m_I32));
 				break;
 			}
@@ -659,26 +751,34 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			auto b = PopUnpack (stack, frame);
 			auto a = PopUnpack (stack, frame);
 			ApplyOp (a, b, +);
+			TryPatchOp (qInstr, a.m_Type, ValUtility::PatchOp::Add);
 			break;
 		}
+		case PatchedOpBlock(ADD, +)
 		case SUB: {
 			auto b = PopUnpack (stack, frame);
 			auto a = PopUnpack (stack, frame);
 			ApplyOp (a, b, -);
+			TryPatchOp (qInstr, a.m_Type, ValUtility::PatchOp::Sub);
 			break;
 		}
+		case PatchedOpBlock(SUB, -);
 		case MUL: {
 			auto b = PopUnpack (stack, frame);
 			auto a = PopUnpack (stack, frame);
 			ApplyOp (a, b, *);
+			TryPatchOp (qInstr, a.m_Type, ValUtility::PatchOp::Mul);
 			break;
 		}
+		case PatchedOpBlock(MUL, *);
 		case DIV: {
 			auto b = PopUnpack (stack, frame);
 			auto a = PopUnpack (stack, frame);
 			ApplyOp (a, b, / );
+			TryPatchOp (qInstr, a.m_Type, ValUtility::PatchOp::Div);
 			break;
 		}
+		case PatchedOpBlock(DIV, /);
 		case SIN: {
 			LinearAlgProc (stack, frame, std::sinf, std::sin);
 			break;
@@ -749,6 +849,18 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 			ApplyOp (a, b, <= );
 			break;
 		}
+		case BITWISEAND: {
+			auto b = PopUnpack (stack, frame);
+			auto a = PopUnpack (stack, frame);
+			ApplyBinaryOp (a, b, &);
+			break;
+		}
+		case BITWISEOR: {
+			auto b = PopUnpack (stack, frame);
+			auto a = PopUnpack (stack, frame);
+			ApplyBinaryOp (a, b, |);
+			break;
+		}
 		case AND: {
 			auto b = PopUnpack (stack, frame);
 			auto a = PopUnpack (stack, frame);
@@ -767,11 +879,12 @@ TucanScript::SInt32 TucanScript::VM::VirtualMachine::HandleInstr (SInt64& qInstr
 		}
 		case SCAN: {
 			auto bufferSize = PopUnpack (stack, frame);
-			if (!TryCast <UInt64> (bufferSize, &Word::m_U64)) {
-				bufferSize.m_Data.m_U64 = 1024ULL; //Default buffer length
+			if (!TryCast <SInt64> (bufferSize, &Word::m_I64)) {
+				bufferSize.m_Data.m_I64 = 1024LL; //Default buffer length
 			}
-			Size bufferLength = bufferSize.m_Data.m_U64;
-			Sym* buffer = (Sym*)std::malloc (bufferLength);
+
+			std::streamsize bufferLength = bufferSize.m_Data.m_I64;
+			auto buffer = reinterpret_cast<Sym*>(std::malloc(bufferLength));
 			std::cin.getline (buffer, bufferLength);
 			Size strLength = std::strlen (buffer);
 			AllocStr (stack, buffer, strLength);
@@ -917,7 +1030,7 @@ Undef TucanScript::VM::VirtualMachine::DoRecordJump (SInt64& qContextInstr, Inst
 	}
 
 	for (SInt32 iArg = PrevWord (numArgs); iArg >= Zero; iArg--) {
-		auto arg = ValUtility::_DWORD_signed_raw (&iArg, false);
+		auto arg = ValUtility::MemCpyDWord (&iArg, false);
 		arg.m_Type = LRADDRESS_T;
 		MemCopy (stack, frameArgs, arg, stack.Pop (), false);
 	}
@@ -943,22 +1056,22 @@ Undef TucanScript::VM::VirtualMachine::ResumeTask (HTask hTask) {
 }
 
 TucanScript::VM::VirtualMachine::VirtualMachine (
-	UInt64 stackSize, 
-	UInt64 fixedMemSize, 
-	UInt64 callDepth, 
-	Asm asm_,
-	UnsafeDeallocator* staticDeallocator) :
-	m_Stack (stackSize),
+	const UInt64 szStackSize,
+	const UInt64 szFixedMemSize,
+	const UInt64 szCallDepth,
+	const Asm asm_,
+	UnsafeDeallocator* hStaticDeallocator) :
+	m_Stack (szStackSize),
 	m_Asm (asm_),
-	m_hGlobalDeallocator (staticDeallocator),
-	m_JmpMemory {
-		.m_Sequence = new Call[NextWord (callDepth)],
-		.m_Capacity = NextWord (callDepth),
-		.m_Depth    = Zero
-	},
+	m_hGlobalDeallocator (hStaticDeallocator),
 	m_FixedMemory {
-		.m_Memory = new Val[fixedMemSize],
-		.m_Size   = fixedMemSize
+		.m_Memory = new Val[szFixedMemSize],
+		.m_Size   = szFixedMemSize
+	},
+	m_JmpMemory {
+		.m_Sequence = new Call[NextWord (szCallDepth)],
+		.m_Capacity = NextWord (szCallDepth),
+		.m_Depth    = Zero
 	},
     m_IPtr { Zero } {
 	m_JmpMemory.ZeroOutMemory ();

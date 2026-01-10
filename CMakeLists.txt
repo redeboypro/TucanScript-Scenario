@@ -4,13 +4,32 @@ project ("TucanScript")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#add_library (Graphics SHARED
-#			#Vulkan
-#			TucanScript/SystemModules/Graphics/Vulkan.h
-#			TucanScript/SystemModules/Graphics/Vulkan.cpp
-#
-#			TucanScript/Utility.h
-#			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+add_library (Graphics SHARED
+			#Vulkan
+			TucanScript/SystemModules/Graphics/Vulkan.h
+			TucanScript/SystemModules/Graphics/Vulkan.cpp
+			TucanScript/Utility.h
+			TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp)
+
+target_include_directories(Graphics PUBLIC
+		TucanScript/ThirdParty/IncludeOSX
+)
+
+target_link_libraries(Graphics PUBLIC
+		# Static libs
+		/Users/redeboy/StaticLibraries/libglfw3.a
+		/Users/redeboy/StaticLibraries/libMoltenVK.a
+
+		# macOS frameworks (ОБЯЗАТЕЛЬНО в таком виде)
+		"-framework Cocoa"
+		"-framework IOKit"
+		"-framework CoreVideo"
+		"-framework CoreFoundation"
+		"-framework Metal"
+		"-framework QuartzCore"
+		"-framework Foundation"
+		"-framework IOSurface"
+)
 
 #Graphics dependencies
 
@@ -48,8 +67,22 @@ add_library (XGUI SHARED
 		TucanScript/SystemModules/GUI/XGUI.mm)
 
 target_link_libraries(XGUI
-		"-framework AppKit"
-)
+		"-framework AppKit")
+
+#add_library(Metal SHARED
+#		TucanScript/Utility.h
+#		TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp
+#		TucanScript/SystemModules/Metal/Metal.cpp TucanScript/SystemModules/Metal/Metal.h)
+
+#target_include_directories(Metal PUBLIC
+#		TucanScript/ThirdParty
+#)
+
+#target_link_libraries(Metal
+#		"-framework Metal"
+#		"-framework MetalKit"
+#		"-framework QuartzCore"
+#		"-framework AppKit")
 
 add_library(Networking SHARED
 		TucanScript/SystemModules/Sockets/Networking.cpp TucanScript/SystemModules/Sockets/Networking.h

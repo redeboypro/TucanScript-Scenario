@@ -4,7 +4,7 @@ using namespace TucanScript;
 
 ExternC {
 	TucanAPI Undef SetCoroutineProps (ExC_Args) {
-		auto scheduler = vm->GetScheduler ();
+		const auto scheduler = vm->GetScheduler ();
 		scheduler->m_TaskMemoryProps.m_CallDepth = ExC_QWordArg (1u);
 		scheduler->m_TaskMemoryProps.m_StackSize = ExC_QWordArg (0u);
 	}
@@ -14,10 +14,10 @@ ExternC {
 	}
 
 	TucanAPI Undef ResumeTask (ExC_Args) {
-		vm->ResumeTask ((VM::HTask) ExC_NativePtrArg (0u));
+		vm->ResumeTask (static_cast<VM::HTask>(ExC_NativePtrArg(0u)));
 	}
 
 	TucanAPI Undef CloseTask (ExC_Args) {
-		vm->CloseTask ((VM::HTask) ExC_NativePtrArg (0u));
+		VM::VirtualMachine::CloseTask (static_cast<VM::HTask>(ExC_NativePtrArg(0u)));
 	}
 }

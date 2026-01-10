@@ -1,17 +1,22 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include <ranges>
+#include <utility>
+
 #include "Lexer.h"
 #include "VirtualMachine.h"
 
 #define RangeInclude(VAL, FIRST, LAST) ((VAL) >= (FIRST) && (VAL) <= (LAST))
 
 #define LowestPrecedence       0x0
-#define OrPrecedence           0x1
-#define AndPrecedence          0x2
-#define CmpPrecedence          0x3
-#define ArithmeticPrecedenceF1 0x4
-#define ArithmeticPrecedenceF2 0x5
+#define BitwiseOrPrecedence    0x1
+#define BitwiseAndPrecedence   0x2
+#define OrPrecedence           0x3
+#define AndPrecedence          0x4
+#define CmpPrecedence          0x5
+#define ArithmeticPrecedenceF1 0x6
+#define ArithmeticPrecedenceF2 0x7
 
 #define IsUndefined(TYPE) ((TYPE) Is Lexer::TokenType::UNDEFINED)
 #define IsLParen(TYPE)    ((TYPE) Is Lexer::TokenType::LPAREN)
@@ -54,7 +59,7 @@ namespace TucanScript {
 		UInt64                       m_NumAutoPtrs {};
 		WhileInfo                    m_EmptyWhileStmt;
 
-		static inline SInt32 Precedence (Lexer::TokenType type) {
+		static SInt32 Precedence (const Lexer::TokenType type) {
 			switch (type) {
 				case Lexer::TokenType::CMPE:
 				case Lexer::TokenType::CMPG:
@@ -71,6 +76,12 @@ namespace TucanScript {
 				case Lexer::TokenType::MUL:
 				case Lexer::TokenType::DIV:
 				return ArithmeticPrecedenceF2;
+
+				case Lexer::TokenType::BITWISEAND:
+				return BitwiseAndPrecedence;
+
+				case Lexer::TokenType::BITWISEOR:
+				return BitwiseOrPrecedence;
 
 				case Lexer::TokenType::AND:
 				return AndPrecedence;
@@ -182,7 +193,7 @@ namespace TucanScript {
 			});
 		}
 
-		inline Undef Call (FuncInfo& funInfo, Boolean async = false) {
+		inline Undef Call (FuncInfo& funInfo, const Boolean async = false) {
 			funInfo.m_Calls.push_back (m_Instructions.size ());
 			m_Instructions.push_back (VM::Instruction {
 				.m_Op  = async ? VM::CALLASYNC : VM::JMPR,
@@ -190,18 +201,18 @@ namespace TucanScript {
 			});
 		}
 
-		inline VM::Val GetInstrEnd (QWord offset = Zero) {
-			QWord instrWord = m_Instructions.size () + offset;
-			return VM::ValUtility::_QWORD_signed_raw (&instrWord, true);
+		inline VM::Val GetInstrEnd (QWord offset = Zero) const {
+			const QWord instrWord = m_Instructions.size () + offset;
+			return VM::ValUtility::MemCpyQWord (&instrWord, true);
 		}
 
-		inline Boolean IsLeftBracket (const Lexer::Token& token) {
+		static inline Boolean IsLeftBracket (const Lexer::Token& token) {
 			return token.m_Type Is Lexer::TokenType::LPAREN ||
 				   token.m_Type Is Lexer::TokenType::LBRACE ||
 				   token.m_Type Is Lexer::TokenType::LSQRBRACKET;
 		}
 
-		inline Boolean IsRightBracket (const Lexer::Token& token) {
+		static inline Boolean IsRightBracket (const Lexer::Token& token) {
 			return token.m_Type Is Lexer::TokenType::RPAREN ||
 				   token.m_Type	Is Lexer::TokenType::RBRACE ||
 				   token.m_Type Is Lexer::TokenType::RSQRBRACKET;
@@ -220,13 +231,13 @@ namespace TucanScript {
 			Boolean externalContext, 
 			Lexer::TokenType opener = Lexer::TokenType::LPAREN);
 
-		Undef ReadTo (
+		static Undef ReadTo (
 			Lexer::TokenType itBreaker, 
 			Lexer::TokenList& inTokens, 
 			SInt32& iToken, 
 			Lexer::TokenList& outTokens);
 
-		Undef ProcStatement (
+		static Undef ProcStatement (
 			Lexer::TokenList& inTokens, 
 			SInt32& iToken, 
 			Lexer::TokenList& outTokens, 
@@ -239,20 +250,22 @@ namespace TucanScript {
 			Boolean innerExpr = false);
 
 		const Dictionary<Lexer::TokenType, VM::OpCode> OpMap {
-			{ Lexer::TokenType::CPY,   VM::MEMCPY },
-			{ Lexer::TokenType::MUL,   VM::MUL },
-			{ Lexer::TokenType::DIV,   VM::DIV },
-			{ Lexer::TokenType::PLUS,  VM::ADD },
-			{ Lexer::TokenType::MINUS, VM::SUB },
-			{ Lexer::TokenType::CMPG,  VM::CMPG },
-			{ Lexer::TokenType::CMPL,  VM::CMPL },
-			{ Lexer::TokenType::CMPE,  VM::CMPE },
-			{ Lexer::TokenType::CMPGE, VM::CMPGE },
-			{ Lexer::TokenType::CMPLE, VM::CMPLE },
-			{ Lexer::TokenType::CMPNE, VM::CMPNE },
-			{ Lexer::TokenType::AND,   VM::AND },
-			{ Lexer::TokenType::OR,    VM::OR },
-			{ Lexer::TokenType::WRITE, VM::MEMSTORE },
+			{ Lexer::TokenType::CPY,        VM::MEMCPY },
+			{ Lexer::TokenType::MUL,        VM::MUL },
+			{ Lexer::TokenType::DIV,        VM::DIV },
+			{ Lexer::TokenType::PLUS,       VM::ADD },
+			{ Lexer::TokenType::MINUS,      VM::SUB },
+			{ Lexer::TokenType::CMPG,       VM::CMPG },
+			{ Lexer::TokenType::CMPL,       VM::CMPL },
+			{ Lexer::TokenType::CMPE,       VM::CMPE },
+			{ Lexer::TokenType::CMPGE,      VM::CMPGE },
+			{ Lexer::TokenType::CMPLE,      VM::CMPLE },
+			{ Lexer::TokenType::CMPNE,      VM::CMPNE },
+			{ Lexer::TokenType::AND,	       VM::AND },
+			{ Lexer::TokenType::OR,         VM::OR },
+			{ Lexer::TokenType::BITWISEAND, VM::BITWISEAND },
+			{ Lexer::TokenType::BITWISEOR,  VM::BITWISEOR },
+			{ Lexer::TokenType::WRITE,      VM::MEMSTORE },
 		};
 
 		const Dictionary<String, InvokableOp> InvokableOpMap {
@@ -263,9 +276,9 @@ namespace TucanScript {
 			{ "long",            VM::TOI64 },
 			{ "ushort",          VM::TOU16 },
 			{ "uint",            VM::TOU32 },
-			{ "DWORD",           VM::TOU32 },
+			{ "dword",           VM::TOU32 },
 			{ "ulong",           VM::TOU64 },
-			{ "QWORD",           VM::TOU64 },
+			{ "qword",           VM::TOU64 },
 			{ "float",           VM::TOF32 },
 			{ "double",          VM::TOF64 },
 			{ "Log",             VM::PRINT },
@@ -305,6 +318,7 @@ namespace TucanScript {
 			{VM::CALLASYNC,     "CallAsync"},
 			{VM::RETURN,        "Return"},
 			{VM::MEMSIZE,       "MemorySize"},
+			{VM::CBUFFERALLOC,  "NativeMemoryAlloc (Aligned)"},
 			{VM::MEMLOAD,       "MemoryLoad"},
 			{VM::MEMSTORE,      "MemoryStore"},
 			{VM::MEMAPPEND,     "MemoryAppend"},
@@ -336,6 +350,8 @@ namespace TucanScript {
 			{VM::CMPLE,         "Compare (Less or equals)"},
 			{VM::AND,           "And"},
 			{VM::OR,            "Or"},
+			{VM::BITWISEAND,    "BitwiseAnd"},
+			{VM::BITWISEOR,     "BitwiseOr"},
 			{VM::PRINT,         "SysOut"},
 			{VM::SCAN,          "SysIn"},
 			{VM::HALT,          "Halt"},
@@ -354,10 +370,9 @@ namespace TucanScript {
 
 	public:
 		inline Undef GenerateInstructionList (Lexer::TokenList rawTokens) {
-			GenerateInstructionList (rawTokens, m_DefinedVars, true, m_EmptyWhileStmt);
-			for (auto& funPair : m_DefinedFuncs) {
-				auto& funInfo = funPair.second;
-				for (auto inst : funInfo.m_Calls) {
+			GenerateInstructionList (std::move(rawTokens), m_DefinedVars, true, m_EmptyWhileStmt);
+			for (auto &funInfo: m_DefinedFuncs | std::views::values) {
+				for (const auto inst : funInfo.m_Calls) {
 					m_Instructions[inst].m_Val.m_Data.m_I64 = funInfo.m_Address;
 				}
 			}
@@ -392,9 +407,9 @@ namespace TucanScript {
 			return InvalidID;
 		}
 
-		VM::ReadOnlyData GetReadOnlyData ();
-		VM::Asm GetAssemblyCode ();
-		Undef LogInstr ();
+		VM::ReadOnlyData GetReadOnlyData () const;
+		VM::Asm GetAssemblyCode () const;
+		Undef LogInstr () const;
         String MakeMetaHeader();
 	};
 }

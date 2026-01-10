@@ -57,6 +57,9 @@ namespace TucanScript::Lexer {
 		MUL,
 		DIV,
 
+		BITWISEAND,
+		BITWISEOR,
+
 		AND,
 		OR,
 
@@ -92,6 +95,7 @@ namespace TucanScript::Lexer {
 		INCLUDE,
 
 		CSTR,
+		CBUFFER
 	};
 
 	struct Token final {
@@ -116,7 +120,9 @@ namespace TucanScript::Lexer {
 		{ ';', TokenType::SEMICOLON },
 		{ ',', TokenType::COMMA },
 		{ '!', TokenType::NOT },
-		{ ':', TokenType::DBLDOT }
+		{ ':', TokenType::DBLDOT },
+		{ '|', TokenType::DBLDOT },
+		{ '&', TokenType::DBLDOT }
 	};
 
 	static const Dictionary<String, TokenType> ReservedWordMap = {
@@ -131,6 +137,7 @@ namespace TucanScript::Lexer {
 		{ "continue", TokenType::CONTINUE },
 		{ "link",     TokenType::INCLUDE },
 		{ "async",    TokenType::ASYNC },
+		{ "cbuff",    TokenType::CBUFFER }
 	};
 
 	class Tokenizer final {
@@ -139,12 +146,12 @@ namespace TucanScript::Lexer {
 		}
 
 		template<TokenType CMPT>
-		inline Boolean BothAre (const TokenType t1, const TokenType t2) {
+		static inline Boolean BothAre (const TokenType t1, const TokenType t2) {
 			return t1 Is CMPT and t2 Is CMPT;
 		}
 		
 		template<typename T>
-		Undef ParseAndApplyNumeric (const String& tokenStr, TokenVal& tokenValue) {
+		Undef ParseAndApplyNumeric (const String& tokenStr, TokenVal& tokenValue) const {
 			T result {};
 			if (TryParse<T> (tokenStr, result)) {
 				tokenValue = result;
@@ -156,11 +163,12 @@ namespace TucanScript::Lexer {
 
 		Boolean StartsWithDigitOrMinus (const String& str);
 		Undef ProcNumericSuffix (Sym source, TokenType& type);
-		Token CreateToken (const TokenVal& value, const TokenType type);
+		Token CreateToken (const TokenVal& value, TokenType type);
 
 	public:
-		Boolean IsTokenReservedSingleChar (Sym source, TokenType& type);
-		Boolean IsTokenReservedWord (const String& source, TokenType& type);
+		static Boolean IsTokenReservedSingleChar (Sym source, TokenType& type);
+
+		static Boolean IsTokenReservedWord (const String& source, TokenType& type);
 
 		TokenList Tokenize (const String& source);
 		TokenList ProcessIncludeDirectories (const TokenList& tokens, String includeSearchDir);

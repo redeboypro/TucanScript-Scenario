@@ -39,6 +39,9 @@ namespace TucanScript::VM {
 #define ExC_ManagedArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr
 #define ExC_StringArg(ARG_ID) ((char*) args->m_Memory[(ARG_ID)].m_Data.m_ManagedPtr->m_Memory.m_hRawBuf)
 #define ExC_NativePtrArg(ARG_ID) args->m_Memory[(ARG_ID)].m_Data.m_NativePtr
+#define ExC_Return(ARG) stack->Push((ARG))
+#define ExC_ReturnPtr(ARG) stack->Push<Undef*, VM::NATIVEPTR_T> ((ARG), &VM::Word::m_NativePtr);
+#define ExC_ReturnManaged(ARG) stack->Push<Managed*, VM::MANAGED_T> ((ARG), &VM::Word::m_ManagedPtr);
 
 #define ExC_Args VM::VirtualMachine* vm, \
 				 VM::VirtualStack* stack,\
@@ -63,6 +66,7 @@ namespace TucanScript::VM {
 		CSTRALLOC,
 		SEQUENCEALLOC,
 		MEMAPPEND,
+		CBUFFERALLOC,
 		MEMALLOC,
 		MEMDEALLOC,
 		MEMCPY,
@@ -83,6 +87,34 @@ namespace TucanScript::VM {
 		MUL,
 		DIV,
 
+		ADD_I32,
+		ADD_U32,
+		ADD_I64,
+		ADD_U64,
+		ADD_F32,
+		ADD_F64,
+
+		SUB_I32,
+		SUB_U32,
+		SUB_I64,
+		SUB_U64,
+		SUB_F32,
+		SUB_F64,
+
+		MUL_I32,
+		MUL_U32,
+		MUL_I64,
+		MUL_U64,
+		MUL_F32,
+		MUL_F64,
+
+		DIV_I32,
+		DIV_U32,
+		DIV_I64,
+		DIV_U64,
+		DIV_F32,
+		DIV_F64,
+
 		SIN,
 		COS,
 		ATAN2,
@@ -95,6 +127,9 @@ namespace TucanScript::VM {
 		CMPL,
 		CMPGE,
 		CMPLE,
+
+		BITWISEAND,
+		BITWISEOR,
 
 		AND,
 		OR,
@@ -156,7 +191,7 @@ namespace TucanScript::VM {
 #pragma pack(pop)
 
 	namespace ValUtility {
-		inline static Val _DWORD_signed_raw (Undef* value, Boolean fromUnsigned) {
+		static Val MemCpyDWord (const Undef* value, const Boolean fromUnsigned) {
 			UInt32 raw {};
 			std::memcpy (&raw, value, sizeof (raw));
 			SInt32 signedWord = fromUnsigned ? static_cast<SInt32>(raw) : std::bit_cast<SInt32>(raw);
@@ -170,7 +205,7 @@ namespace TucanScript::VM {
 			};
 		}
 
-		inline static Val _QWORD_signed_raw (Undef* value, Boolean fromUnsigned) {
+		static Val MemCpyQWord (const Undef* value, const Boolean fromUnsigned) {
 			UInt64 raw {};
 			std::memcpy (&raw, value, sizeof (raw));
 			SInt64 signedWord = fromUnsigned ? static_cast<SInt64>(raw) : std::bit_cast<SInt64>(raw);
@@ -200,6 +235,28 @@ namespace TucanScript::VM {
 			{NATIVEPTR_T, sizeof (Undef*)},
 			{RADDRESS_T,  sizeof (SInt32)},
 			{LRADDRESS_T, sizeof (SInt32)},
+		};
+
+		struct PatchOp final {
+			static constexpr auto Inv = static_cast<OpCode>(0x0);
+
+#define GenPatchTable(OP) {	\
+			Inv,			\
+			Inv,			\
+			Inv,			\
+			OP##_I32,		\
+			OP##_I64,		\
+			Inv,			\
+			OP##_U32,		\
+			OP##_U64,		\
+			OP##_F32,		\
+			OP##_F64,		\
+		};
+
+			static constexpr OpCode Add[] = GenPatchTable(ADD);
+			static constexpr OpCode Sub[] = GenPatchTable(SUB);
+			static constexpr OpCode Mul[] = GenPatchTable(MUL);
+			static constexpr OpCode Div[] = GenPatchTable(DIV);
 		};
 	};
 
@@ -234,6 +291,34 @@ namespace TucanScript::VM {
 		delete[] roData.m_Memory;
 	}
 
+	namespace CBufferUtility {
+		template<typename TYPE = std::byte>
+		static TYPE* GetDirectMemory(const Val& val) {
+			if (val.m_Type Is MANAGED_T)
+				return reinterpret_cast<TYPE *>(val.m_Data.m_ManagedPtr->m_Memory.m_hRawBuf);
+			else
+				return reinterpret_cast<TYPE *>(val.m_Data.m_NativePtr);
+		}
+
+		template<typename TYPE>
+		static TYPE* GetCBuffer(const Managed* hManaged) {
+			auto buffer = reinterpret_cast<TYPE*>(std::malloc(sizeof(TYPE) * hManaged->m_Size));
+			for (auto i = 0; i < hManaged->m_Size; i++) {
+				buffer[i] = *reinterpret_cast<TYPE*>(hManaged->m_Memory.m_hSpecBuf[i].m_Data.m_ManagedPtr->m_Memory.m_hRawBuf);
+			}
+			return buffer;
+		}
+
+		template<typename TYPE>
+		static TYPE* GetCBuffer(const Managed* hManaged, TYPE Word::* sourceField) {
+			auto buffer = reinterpret_cast<TYPE*>(std::malloc(sizeof(TYPE) * hManaged->m_Size));
+			for (auto i = 0; i < hManaged->m_Size; i++) {
+				buffer[i] = reinterpret_cast<TYPE>(hManaged->m_Memory.m_hSpecBuf[i].m_Data.*sourceField);
+			}
+			return buffer;
+		}
+	}
+
 	struct Call final {
 		ValMem m_Memory;
 		SInt64 m_Address;
@@ -244,7 +329,7 @@ namespace TucanScript::VM {
 		Size  m_Capacity;
 		Size  m_Depth;
 
-		inline Undef ZeroOutMemory () {
+		Undef ZeroOutMemory () const {
 			if (!m_Sequence)
 				return;
 
@@ -252,8 +337,8 @@ namespace TucanScript::VM {
 				m_Sequence[qCall].m_Memory.m_Memory = nullptr;
 			}
 		}
-		
-		inline Undef Free () {
+
+		Undef Free () {
 			if (!m_Sequence)
 				return;
 
@@ -302,7 +387,7 @@ namespace TucanScript::VM {
 		const Size m_Size;
 
 		template<typename CTYPE, ValType TYPE>
-		inline Undef Push (CTYPE value, CTYPE Word::* field) {
+		Undef Push (CTYPE value, CTYPE Word::* field) {
 			Val result {
 				.m_Type = TYPE
 			};
@@ -330,7 +415,7 @@ namespace TucanScript::VM {
 		Managed* m_hEnd;
 		UInt64   m_nBlocks { Zero };
 
-		inline Managed* Pin (Managed* allocated) {
+		Managed* Pin (Managed* allocated) {
 			if (m_hEnd) {
 				m_hEnd->m_hNext = allocated;
 			}
@@ -357,12 +442,12 @@ namespace TucanScript::VM {
 
 		Undef Free (Managed* ptr, Boolean removeReferences = true);
 
-		inline Undef RemoveRef (Managed* ptr) {
+		Undef RemoveRef (Managed* ptr) {
 			ptr->m_RefCount--;
 			HandleReferences (ptr);
 		}
 
-		inline Undef HandleReferences (Managed* ptr) {
+		Undef HandleReferences (Managed* ptr) {
 			if (ptr->m_RefCount <= Zero) {
 				Free (ptr);
 			}
@@ -456,6 +541,12 @@ namespace TucanScript::VM {
 
 		Undef FreeManagedMemory (Val* memory);
 
+		Undef TryPatchOp(const SInt64& iInstr, const ValType& uType, const OpCode* pPatchTable) const {
+			if (const auto uPatchedOp = pPatchTable[uType]; uPatchedOp != ValUtility::PatchOp::Inv) {
+				m_Asm.m_Memory[iInstr].m_Op = uPatchedOp;
+			}
+		}
+
 		template<typename TYPE>
 		Boolean TryCast (Val& value, TYPE Word::* sourceField) {
 			switch (value.m_Type) {
@@ -489,9 +580,14 @@ namespace TucanScript::VM {
 				case FLOAT64_T:
 				value.m_Data.*sourceField = static_cast<TYPE>(value.m_Data.m_F64);
 				break;
-				case NATIVEPTR_T:
-				value.m_Data.*sourceField = *reinterpret_cast<TYPE*>(value.m_Data.m_NativePtr);
-				break;
+				case NATIVEPTR_T: {
+					std::memcpy(
+						&(value.m_Data.*sourceField),
+						reinterpret_cast<const std::byte*>(value.m_Data.m_NativePtr),
+						sizeof(TYPE)
+					);
+					break;
+				}
 				default: {
 					LogInstErr ("CAST", "Invalid type to cast!");
 					Free ();
@@ -502,14 +598,23 @@ namespace TucanScript::VM {
 		}
 
 		template<typename TYPE>
-		inline Undef Cast (Val& data, ValType type, TYPE Word::* sourceField) {
-			if (TryCast<TYPE> (data, sourceField)) {
-				data.m_Type = type;
-				m_Stack.Push(data);
+		Undef Cast (Val& data, const ValType type, TYPE Word::* sourceField, const Boolean valCpy = true) {
+			Val tmp;
+			Val* pData = &data;
+
+			if (valCpy) {
+				tmp = data;
+				pData = &tmp;
+			}
+
+			if (!TryCast<TYPE>(*pData, sourceField)) {
+				LogInstErr("CAST", "Unable to cast!");
+				Free();
 				return;
 			}
-			LogInstErr ("CAST", "Unable to cast!");
-			Free ();
+
+			pData->m_Type = type;
+			m_Stack.Push(*pData);
 		}
 
 		template<typename TYPE>
@@ -595,48 +700,47 @@ namespace TucanScript::VM {
 				   (value.m_Type Is NATIVEPTR_T && value.m_Data.m_NativePtr);
 		}
 
-		Sym* GetCStr (const Managed* managedMemory);
+		static Sym* GetCStr (const Managed* managedMemory);
 		Undef AllocStr (VirtualStack& stack, Sym* buffer, Size size);
 
-		TucanScript::SInt32 HandleInstr (SInt64& qInstr, VirtualStack& stack, JmpMemory& frame);
+		SInt32 HandleInstr (SInt64& qInstr, VirtualStack& stack, JmpMemory& frame);
 
 		Undef DoRecordJump (SInt64& qContextInstr, Instruction& jmpInstr,
 			VirtualStack& stack,
 			const MemCpyFrameArgs& frameArgs);
 
-		static Val GetRawElement (Managed* managedMemory, UInt64 index) {
-			auto rawMemory =
+		static Val GetRawElement (const Managed* managedMemory, UInt64 index) {
+			const auto pRawMemory =
 			#if CHAR_MIN < 0
-				(SInt8*) managedMemory;
+				reinterpret_cast<SInt8*>(managedMemory->m_Memory.m_hRawBuf);
 			#else
-				(UInt8*) managedMemory;
+				reinterpret_cast<UInt8*>(managedMemory->m_Memory.m_hRawBuf);
 			#endif
 			return Val {
 				.m_Type = NATIVEPTR_T,
-				.m_Data = Word { 
-					.m_NativePtr = &(rawMemory)[index]
+				.m_Data = Word {
+					.m_NativePtr = &pRawMemory[index]
 				}
 			};
 		}
 
-		inline Undef LinearAlgProc (
+		Undef LinearAlgProc (
 			VirtualStack& stack,
 			JmpMemory& frame,
 			Dec32 (*f32)(Dec32), Dec64 (*f64)(Dec64)) {
-			auto angle = PopUnpack (stack, frame);
-			if (angle.m_Type Is ValType::FLOAT32_T) {
-				stack.Push (f32 (angle.m_Data.m_F32));
+			if (auto [m_Type, m_Data] = PopUnpack (stack, frame); m_Type Is FLOAT32_T) {
+				stack.Push (f32 (m_Data.m_F32));
 			}
-			else if (angle.m_Type Is ValType::FLOAT64_T) {
-				stack.Push (f64 (angle.m_Data.m_F64));
+			else if (m_Type Is FLOAT64_T) {
+				stack.Push (f64 (m_Data.m_F64));
 			}
 		}
 
 	public:
 		VirtualMachine (
-			UInt64 stackSize,
-			UInt64 fixedMemSize,
-			UInt64 callDepth,
+			UInt64 szStackSize,
+			UInt64 szFixedMemSize,
+			UInt64 szCallDepth,
 			Asm asm_,
 			UnsafeDeallocator* hStaticDeallocator);
 
@@ -692,8 +796,8 @@ namespace TucanScript::VM {
 			return m_IPtr < Zero || m_IPtr >= m_Asm.m_Size || m_Free;
 		}
 
-		inline Undef ForceExitProgram () { 
-			m_IPtr = _Exit; 
+		inline Undef ForceExitProgram () {
+			m_IPtr = _Exit;
 		}
 
 		inline Undef WriteChunk (Size qChunkPtr, const Val& chunkVal) const {

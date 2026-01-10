@@ -165,8 +165,8 @@ ExternC {
     }
 
     TucanAPI Undef Net_Recv(ExC_Args) {
-        auto hBuff = ExC_ManagedArg(1);
-        ssize_t n = recv(ExC_Int32Arg(0), hBuff->m_Memory.m_hRawBuf, hBuff->m_Size, Zero);
+        const auto hBuff = ExC_ManagedArg(1);
+        const ssize_t n = recv(ExC_Int32Arg(0), hBuff->m_Memory.m_hRawBuf, hBuff->m_Size, Zero);
         if (n > 0) {
             hBuff->m_Size = n;
         } else if (n == 0) {
@@ -175,7 +175,7 @@ ExternC {
             hBuff->m_Size = 0;
             LogErr("Connection error!");
         }
-        stack->Push((SInt32)n);
+        stack->Push(static_cast<SInt32>(n));
     }
 
     TucanAPI Undef Net_UdpSocket(ExC_Args) {

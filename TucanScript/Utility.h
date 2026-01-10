@@ -113,6 +113,7 @@ namespace TucanScript {
 
 	typedef UInt64 QWord;
 	typedef UInt32 DWord;
+	typedef uintptr_t RPtr_t;
 
 	template <typename T>
 	struct MemoryView final {
@@ -124,6 +125,66 @@ namespace TucanScript {
 	constexpr Boolean SizeEquals () {
 		return sizeof (A_T) == sizeof (B_T);
 	}
+
+	constexpr static Size PtrSizeInBytes  = sizeof(Undef*);
+	constexpr static Size PtrAlignInBytes = alignof(Undef*);
+
+	inline Size Align(const Size off, const Size align) {
+		return (off + PrevWord(align)) & ~PrevWord(align);
+	}
+
+	inline Undef* AllocAligned(const Size size, Size alignment) {
+		if (alignment < PtrAlignInBytes)
+			alignment = PtrAlignInBytes;
+
+		if ((alignment & PrevWord(alignment)) != Zero)
+			return nullptr;
+
+		const Size szTotal = size + alignment - 1 + PtrSizeInBytes;
+
+		Undef* pBuffer = std::malloc(szTotal);
+		if (!pBuffer)
+			return nullptr;
+
+		const RPtr_t uRawAddr = reinterpret_cast<RPtr_t>(pBuffer) + PtrSizeInBytes;
+		const RPtr_t uAlignedAddr = (uRawAddr + PrevWord(alignment)) & ~PrevWord(alignment);
+
+		reinterpret_cast<Undef**>(uAlignedAddr)[-1] = pBuffer;
+
+		return reinterpret_cast<Undef*>(uAlignedAddr);
+	}
+
+	inline Undef FreeAligned(Undef* ptr) {
+		if (!ptr)
+			return;
+
+		const auto pBuffer = *reinterpret_cast<Undef**>(
+			static_cast<std::byte*>(ptr) - sizeof(Undef*)
+		);
+
+		std::free(pBuffer);
+	}
+
+	inline Undef CpyAligned(
+		Undef* pDst,
+		Size offset,
+		const Undef* pSrc,
+		const Size uSize,
+		const Size uAlign
+	)	{
+		offset = Align(offset, uAlign);
+		std::memcpy(reinterpret_cast<std::byte*>(pDst) + offset, pSrc, uSize);
+	}
+
+#define FCpy(DST, OFF, VAL)   CpyAligned(DST, OFF, &VAL, sizeof(Dec32),  alignof(Dec32))
+#define DCpy(DST, OFF, VAL)   CpyAligned(DST, OFF, &VAL, sizeof(Dec64),  alignof(Dec64))
+#define I16Cpy(DST, OFF, VAL) CpyAligned(DST, OFF, &VAL, sizeof(SInt16), alignof(SInt16))
+#define U16Cpy(DST, OFF, VAL) CpyAligned(DST, OFF, &VAL, sizeof(UInt16), alignof(UInt16))
+#define I32Cpy(DST, OFF, VAL) CpyAligned(DST, OFF, &VAL, sizeof(SInt32), alignof(SInt32))
+#define U32Cpy(DST, OFF, VAL) CpyAligned(DST, OFF, &VAL, sizeof(UInt32), alignof(UInt32))
+#define I64Cpy(DST, OFF, VAL) CpyAligned(DST, OFF, &VAL, sizeof(SInt64), alignof(SInt64))
+#define U64Cpy(DST, OFF, VAL) CpyAligned(DST, OFF, &VAL, sizeof(UInt64), alignof(UInt64))
+
 #pragma endregion
 
 #pragma region [STL Aliases and Utilities]
