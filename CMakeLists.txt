@@ -4,6 +4,9 @@ project ("TucanScript")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Vulkan QUIET)
+
+if(TARGET Vulkan::Vulkan)
 add_library (Graphics SHARED
 			#Vulkan
 			TucanScript/SystemModules/Graphics/Vulkan.h
@@ -30,6 +33,7 @@ target_link_libraries(Graphics PUBLIC
 		"-framework Foundation"
 		"-framework IOSurface"
 )
+endif()
 
 #Graphics dependencies
 
