@@ -2,7 +2,7 @@
 
 using namespace TucanScript;
 
-TucanScript::VM::UnsafeDeallocator::UnsafeDeallocator () : m_Handles (nullptr), m_NumHandles (NULL) {}
+TucanScript::VM::UnsafeDeallocator::UnsafeDeallocator () : m_Handles (nullptr), m_NumHandles (0) {}
 
 TucanScript::VM::UnsafeDeallocator::~UnsafeDeallocator () {
 	Free ();
@@ -317,7 +317,7 @@ Undef TucanScript::VM::VirtualMachine::AllocStr (VirtualStack& stack, Sym* buffe
 		#else
 			.m_Type = BYTE_T,
 			.m_Data = Word {
-				.m_UC = buffer[iSym]
+				.m_UC = static_cast<UInt8> (buffer[iSym])
 			}
 		#endif
 		};
