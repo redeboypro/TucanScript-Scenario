@@ -4,6 +4,11 @@ project ("TucanScript")
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Find Vulkan
+find_package(Vulkan QUIET)
+
+# Add Graphics module if found
+if(TARGET Vulkan::Vulkan)
 add_library (Graphics SHARED
 			#Vulkan
 			TucanScript/SystemModules/Graphics/Vulkan.h
@@ -30,6 +35,7 @@ target_link_libraries(Graphics PUBLIC
 		"-framework Foundation"
 		"-framework IOSurface"
 )
+endif()
 
 #Graphics dependencies
 
@@ -61,6 +67,8 @@ add_library (IO SHARED
 		TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp
 		TucanScript/SystemModules/IO/IO.h TucanScript/SystemModules/IO/IO.cpp)
 
+# XGUI is supported by MacOS only.
+if(APPLE)
 add_library (XGUI SHARED
 		TucanScript/Utility.h
 		TucanScript/VirtualMachine.h TucanScript/VirtualMachine.cpp
@@ -68,6 +76,7 @@ add_library (XGUI SHARED
 
 target_link_libraries(XGUI
 		"-framework AppKit")
+endif()
 
 #add_library(Metal SHARED
 #		TucanScript/Utility.h

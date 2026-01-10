@@ -8,12 +8,14 @@
 	#define __stdcall
 #endif
 
+#include <cmath>
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <cstdint>
 #include <ostream>
 #include <sstream>
+#include <cstring>
 #include <string>
 #include <array>
 #include <vector>
