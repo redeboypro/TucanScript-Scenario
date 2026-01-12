@@ -8,20 +8,26 @@
 	#define __stdcall
 #endif
 
-#include <cmath>
+#if defined(__linux__)
+	#include <cmath>
+#endif
+
 #include <chrono>
 #include <filesystem>
 #include <iostream>
 #include <cstdint>
 #include <ostream>
 #include <sstream>
-#include <cstring>
+
+#if !defined(__APPLE__)
+	#include <cstring>
+#endif
+
 #include <string>
 #include <array>
 #include <vector>
 #include <variant>
 #include <unordered_map>
-#include <type_traits>
 #include <stack>
 #include <deque>
 #include <fstream>
@@ -132,7 +138,7 @@ namespace TucanScript {
 	constexpr static Size PtrAlignInBytes = alignof(Undef*);
 
 	inline Size Align(const Size off, const Size align) {
-		return (off + PrevWord(align)) & ~PrevWord(align);
+		return off + PrevWord(align) & ~PrevWord(align);
 	}
 
 	inline Undef* AllocAligned(const Size size, Size alignment) {
